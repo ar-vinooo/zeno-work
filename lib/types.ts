@@ -1,0 +1,120 @@
+export type Status = "todo" | "in_progress" | "blocked" | "done";
+export type Priority = "low" | "medium" | "high";
+
+/** Baris seperti tersimpan di DB. Nomor WBS TIDAK ada di sini — lihat lib/tree.ts. */
+export interface Task {
+  id: string;
+  parentId: string | null;
+  /** Urutan di antara saudara sekandung. Dinormalisasi 0..n setelah tiap pemindahan. */
+  order: number;
+  title: string;
+  progress: number;
+  start: string; // YYYY-MM-DD
+  end: string; // YYYY-MM-DD
+  status: Status;
+  priority: Priority;
+  collapsed: boolean;
+  /** true = progres & tanggal induk dihitung dari anak (§4.3 PRD). */
+  rollup: boolean;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Nilai efektif setelah roll-up. Untuk daun = nilai tersimpan apa adanya. */
+export interface Effective {
+  progress: number;
+  start: string;
+  end: string;
+  status: Status;
+}
+
+export interface TaskNode {
+  task: Task;
+  children: TaskNode[];
+  depth: number;
+  /** "1", "1.2", "1.2.3" — selalu dihitung ulang, tidak pernah disimpan. */
+  wbs: string;
+  eff: Effective;
+  /** Induk ber-roll-up: sel Progress/Start/End read-only. */
+  derived: boolean;
+}
+
+/** Satu baris yang benar-benar digambar di tabel. */
+export interface Row extends TaskNode {
+  /** Hanya tampil sebagai konteks leluhur dari hasil filter (§5.6). */
+  contextOnly: boolean;
+}
+
+/** Perubahan parsial yang dikirim ke API sebagai satu transaksi. */
+export type Patch = { id: string } & Partial<Omit<Task, "id">>;
+
+export type SortColumn =
+  | "manual"
+  | "title"
+  | "progress"
+  | "start"
+  | "end"
+  | "status"
+  | "priority";
+
+export interface SortSpec {
+  column: SortColumn;
+  dir: "asc" | "desc";
+}
+
+/**
+ * Rentang tanggal cepat di toolbar. "all" = tanpa batas periode.
+ * Akhiran "-onward" = dari awal periode itu ke depan, tanpa batas akhir.
+ */
+export type DateRange =
+  | "all"
+  | "today"
+  | "week"
+  | "month"
+  | "today-onward"
+  | "week-onward"
+  | "month-onward";
+
+export interface Filters {
+  query: string;
+  range: DateRange;
+  status: Status[];
+  priority: Priority[];
+  hideDone: boolean;
+  overdueOnly: boolean;
+  activeOnly: boolean;
+}
+
+export const EMPTY_FILTERS: Filters = {
+  query: "",
+  range: "all",
+  status: [],
+  priority: [],
+  hideDone: false,
+  overdueOnly: false,
+  activeOnly: false,
+};
+
+export const STATUS_LABEL: Record<Status, string> = {
+  todo: "Todo",
+  in_progress: "Jalan",
+  blocked: "Blocked",
+  done: "Done",
+};
+
+export const RANGE_LABEL: Record<DateRange, string> = {
+  all: "Semua",
+  today: "Hari ini",
+  week: "Minggu ini",
+  month: "Bulan ini",
+  "today-onward": "Hari ini ke depan",
+  "week-onward": "Minggu ini ke depan",
+  "month-onward": "Bulan ini ke depan",
+};
+
+export const PRIORITY_LABEL: Record<Priority, string> = {
+  low: "Rendah",
+  medium: "Sedang",
+  high: "Tinggi",
+};

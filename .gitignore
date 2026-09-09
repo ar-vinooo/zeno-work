@@ -1,0 +1,19 @@
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo
+data/*.db
+data/*.db-journal
+data/backups/
+.DS_Store
+
+# Kunci API & setelan lokal
+.env
+.env.local
+
+# SQLite: WAL/SHM ikut memuat isi database, bukan cuma berkas .db
+data/*.db-wal
+data/*.db-shm
+
+# Data pekerjaan asli (sumber `npm run import`)
+docs/data.txt

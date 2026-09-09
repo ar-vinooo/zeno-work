@@ -1,0 +1,333 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-canvas: #faf9f7;
+  --color-surface: #ffffff;
+  --color-raised: #f2efeb;
+  --color-line: #e4e0da;
+  --color-line-strong: #cec8c0;
+  --color-ink: #1b1a18;
+  --color-ink-soft: #6f6862;
+  --color-faint: #a49d95;
+  --color-mark: #b45309;
+  --color-mark-soft: #fdf0e0;
+  --color-bar-fill: #3f5566;
+  --color-done: #4f7a52;
+  --color-blocked: #b0503f;
+  --color-selected: #eef3f7;
+
+  /* Empat warna Gantt, diambil apa adanya dari lembar Excel DTDI. Harus sama
+     dengan PALETTE_TOKENS di lib/palette.ts — dijaga oleh `npm test` — karena
+     lembar XLSX memakai angka yang sama. */
+  --color-bar: #8ed973;
+  --color-bar-track: #daf2d0;
+  --color-level-1: #d9d9d9;
+  --color-level-2: #f2f2f2;
+  /* Baris yang baru diubah AI dan belum disimpan. Ungu dipilih karena satu-
+     satunya warna yang belum punya arti lain di tabel ini. */
+  --color-ai: #f1edfa;
+  --color-ai-edge: #7c6bb0;
+
+  --row-h: 32px;
+  --indent: 16px;
+
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #141312;
+    --color-surface: #1a1918;
+    --color-raised: #232120;
+    --color-line: #302d2b;
+    --color-line-strong: #46413e;
+    --color-ink: #eae7e3;
+    --color-ink-soft: #a09992;
+    --color-faint: #6d6660;
+    --color-mark: #e0913f;
+    --color-mark-soft: #33261a;
+    --color-bar-fill: #8fb0c9;
+    --color-done: #6f9f72;
+    --color-blocked: #d0705e;
+    --color-selected: #23292f;
+
+    /* Padanan gelap: hijau Excel dipertahankan sebagai bagian pekat, tapi
+       rentangnya digelapkan — #daf2d0 nyaris putih dan akan menelan teks
+       baris di mode ini. */
+    --color-bar: #6faf58;
+    --color-bar-track: #22301c;
+    --color-level-1: #2a2725;
+    --color-level-2: #201e1d;
+    --color-ai: #262234;
+    --color-ai-edge: #9d8ed0;
+
+  }
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* Baris tabel dan bar timeline harus persis setinggi ini agar sejajar. */
+.row {
+  height: var(--row-h);
+}
+
+.cell {
+  padding-inline: 6px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+input.bare {
+  background: transparent;
+  outline: none;
+  width: 100%;
+  color: inherit;
+}
+
+.scroll-pane {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+.scroll-pane::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.scroll-pane::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 6px;
+  border: 3px solid var(--color-canvas);
+}
+
+.no-select {
+  user-select: none;
+}
+
+/* Markdown di panel Asisten. Sengaja padat: lebarnya hanya 340px, jadi
+   jarak antar-blok dijaga kecil dan tabel dibiarkan menggulir sendiri. */
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md pre,
+.md blockquote,
+.md table {
+  margin-block: 0.4em;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin-block: 0.6em 0.3em;
+  font-weight: 600;
+  font-size: 1em;
+}
+.md ul,
+.md ol {
+  padding-left: 1.1em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li {
+  margin-block: 0.15em;
+}
+.md li::marker {
+  color: var(--color-faint);
+}
+.md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+  background: var(--color-raised);
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+.md pre {
+  background: var(--color-raised);
+  border-radius: 4px;
+  padding: 0.5em 0.6em;
+  overflow-x: auto;
+}
+.md pre code {
+  background: none;
+  padding: 0;
+}
+.md a {
+  color: var(--color-mark);
+  text-decoration: underline;
+}
+.md blockquote {
+  border-left: 2px solid var(--color-line-strong);
+  padding-left: 0.6em;
+  color: var(--color-ink-soft);
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  margin-block: 0.7em;
+}
+.md table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.md th,
+.md td {
+  border: 1px solid var(--color-line);
+  padding: 0.2em 0.45em;
+  text-align: left;
+}
+.md th {
+  background: var(--color-raised);
+  font-weight: 600;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: #faf9f7;
+  --foreground: #1b1a18;
+  --card: #ffffff;
+  --card-foreground: #1b1a18;
+  --popover: #ffffff;
+  --popover-foreground: #1b1a18;
+  --primary: #b45309;
+  --primary-foreground: #fffaf4;
+  --secondary: #f2efeb;
+  --secondary-foreground: #1b1a18;
+  --muted: #f2efeb;
+  --muted-foreground: #6f6862;
+  --accent: #ece7e1;
+  --accent-foreground: #1b1a18;
+  --destructive: #b0503f;
+  --border: #e4e0da;
+  --input: #e4e0da;
+  --ring: #b45309;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.5rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: #141312;
+  --foreground: #eae7e3;
+  --card: #1a1918;
+  --card-foreground: #eae7e3;
+  --popover: #1f1e1c;
+  --popover-foreground: #eae7e3;
+  --primary: #e0913f;
+  --primary-foreground: #1a1310;
+  --secondary: #232120;
+  --secondary-foreground: #eae7e3;
+  --muted: #232120;
+  --muted-foreground: #a09992;
+  --accent: #2c2927;
+  --accent-foreground: #eae7e3;
+  --destructive: #d0705e;
+  --border: #302d2b;
+  --input: #37332f;
+  --ring: #e0913f;
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

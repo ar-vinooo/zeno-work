@@ -1,0 +1,411 @@
+"use client";
+
+import { useRef } from "react";
+import {
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Columns3,
+  Crosshair,
+  Download,
+  Filter,
+  Redo2,
+  Save,
+  Search,
+  Settings,
+  Sparkles,
+  Undo2,
+  Upload,
+} from "lucide-react";
+import { Button } from "@/components/animate-ui/components/buttons/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/animate-ui/components/radix/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/animate-ui/components/radix/tooltip";
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/components/animate-ui/components/animate/tabs";
+import { useStore } from "@/lib/store";
+import { buildOutline } from "@/lib/rollup";
+import { durationOf } from "@/lib/dates";
+import {
+  RANGE_LABEL,
+  STATUS_LABEL,
+  type DateRange,
+  type Status,
+} from "@/lib/types";
+import type { Stats } from "@/lib/rows";
+import type { ZoomUnit } from "@/lib/schedule";
+
+/** Rentang tertutup, lalu rentang terbuka ke depan — dipisah di menunya. */
+const RANGES: DateRange[] = ["all", "today", "week", "month"];
+const ONWARD_RANGES: DateRange[] = [
+  "today-onward",
+  "week-onward",
+  "month-onward",
+];
+
+const ZOOMS: { value: ZoomUnit; label: string }[] = [
+  { value: "day", label: "Hari" },
+  { value: "week", label: "Minggu" },
+  { value: "month", label: "Bulan" },
+];
+
+function download(name: string, content: string, type: string) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function Toolbar({
+  stats,
+  onJumpToday,
+}: {
+  stats: Stats;
+  onJumpToday: () => void;
+}) {
+  const tasks = useStore((s) => s.tasks);
+  const filters = useStore((s) => s.filters);
+  const setFilters = useStore((s) => s.setFilters);
+  const resetFilters = useStore((s) => s.resetFilters);
+  const sort = useStore((s) => s.sort);
+  const setSortColumn = useStore((s) => s.setSortColumn);
+  const applySortAsOrder = useStore((s) => s.applySortAsOrder);
+  const zoom = useStore((s) => s.zoom);
+  const setZoom = useStore((s) => s.setZoom);
+  const setAllCollapsed = useStore((s) => s.setAllCollapsed);
+  const showDuration = useStore((s) => s.showDuration);
+  const toggleDurationColumn = useStore((s) => s.toggleDurationColumn);
+  const undo = useStore((s) => s.undo);
+  const redo = useStore((s) => s.redo);
+  const canUndo = useStore((s) => s.past.length > 0);
+  const canRedo = useStore((s) => s.future.length > 0);
+  const saving = useStore((s) => s.saving);
+  const error = useStore((s) => s.error);
+  const pending = useStore((s) => s.pending);
+  const save = useStore((s) => s.save);
+  const refresh = useStore((s) => s.refresh);
+
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const exportCsv = () => {
+    const outline = buildOutline(tasks, { column: "manual", dir: "asc" });
+    const head = "wbs,task,progress,start,end,durasi,status,parentId,id";
+    const lines = outline.all.map((n) =>
+      [
+        n.wbs,
+        `"${n.task.title.replace(/"/g, '""')}"`,
+        n.eff.progress,
+        n.eff.start,
+        n.eff.end,
+        durationOf(n.eff.start, n.eff.end),
+        n.eff.status,
+        n.task.parentId ?? "",
+        n.task.id,
+      ].join(","),
+    );
+    download("zeno-work.csv", [head, ...lines].join("\n"), "text/csv");
+  };
+
+  const exportMarkdown = () => {
+    const outline = buildOutline(tasks, { column: "manual", dir: "asc" });
+    const lines = outline.all.map(
+      (n) =>
+        `${"  ".repeat(n.depth)}- **${n.wbs}** ${n.task.title} — ${n.eff.progress}% · ${n.eff.start} → ${n.eff.end}`,
+    );
+    download("zeno-work.md", lines.join("\n"), "text/markdown");
+  };
+
+  const importJson = async (file: File) => {
+    const text = await file.text();
+    const parsed = JSON.parse(text) as { tasks?: unknown };
+    await fetch("/api/backup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tasks: parsed.tasks ?? parsed, mode: "replace" }),
+    });
+    await refresh();
+  };
+
+  const iconButton = (
+    label: string,
+    icon: React.ReactNode,
+    onClick: () => void,
+    disabled?: boolean,
+  ) => (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-7"
+          onClick={onClick}
+          disabled={disabled}
+        >
+          {icon}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+
+  return (
+    <header className="shrink-0 border-b border-[var(--color-line)] bg-[var(--color-raised)]">
+      <div className="flex h-11 items-center gap-2 px-3">
+        <span className="text-[13px] font-semibold tracking-tight">ZenoWork</span>
+
+        <div className="relative ml-2 w-56">
+          <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-[var(--color-faint)]" />
+          <input
+            id="zeno-search"
+            value={filters.query}
+            onChange={(e) => setFilters({ query: e.target.value })}
+            placeholder="Cari task atau nomor…"
+            className="h-7 w-full rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] pl-7 pr-2 text-[12px] outline-none focus:border-[var(--color-mark)]"
+          />
+        </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-7 gap-1.5 text-[12px]">
+              <Filter className="size-3.5" />
+              Filter
+              {filters.range !== "all" && (
+                <span className="rounded bg-[var(--color-mark)]/15 px-1 text-[10px] text-[var(--color-mark)]">
+                  {RANGE_LABEL[filters.range]}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuLabel>Periode</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={filters.range}
+              onValueChange={(v) => setFilters({ range: v as DateRange })}
+            >
+              {RANGES.map((r) => (
+                <DropdownMenuRadioItem key={r} value={r}>
+                  {RANGE_LABEL[r]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuLabel>Sejak periode itu ke depan</DropdownMenuLabel>
+            <DropdownMenuRadioGroup
+              value={filters.range}
+              onValueChange={(v) => setFilters({ range: v as DateRange })}
+            >
+              {ONWARD_RANGES.map((r) => (
+                <DropdownMenuRadioItem key={r} value={r}>
+                  {RANGE_LABEL[r]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Tampilkan</DropdownMenuLabel>
+            <DropdownMenuCheckboxItem
+              checked={filters.activeOnly}
+              onCheckedChange={(v) => setFilters({ activeOnly: !!v })}
+            >
+              Hanya yang aktif
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={filters.hideDone}
+              onCheckedChange={(v) => setFilters({ hideDone: !!v })}
+            >
+              Sembunyikan Done
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={filters.overdueOnly}
+              onCheckedChange={(v) => setFilters({ overdueOnly: !!v })}
+            >
+              Overdue saja
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+              <DropdownMenuCheckboxItem
+                key={s}
+                checked={filters.status.includes(s)}
+                onCheckedChange={(v) =>
+                  setFilters({
+                    status: v
+                      ? [...filters.status, s]
+                      : filters.status.filter((x) => x !== s),
+                  })
+                }
+              >
+                {STATUS_LABEL[s]}
+              </DropdownMenuCheckboxItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={resetFilters}>Reset filter</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Mode urutan (§5.3): sorting tidak pernah menulis ulang urutan manual
+            kecuali diminta lewat tombol ini. */}
+        {sort.column === "manual" ? (
+          <span className="rounded border border-[var(--color-line)] px-1.5 py-0.5 text-[11px] text-[var(--color-ink-soft)]">
+            Urutan manual
+          </span>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className="rounded border border-[var(--color-mark)] px-1.5 py-0.5 text-[11px] text-[var(--color-mark)]">
+              Terurut: {sort.column} {sort.dir === "asc" ? "↑" : "↓"}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[11px]"
+              onClick={applySortAsOrder}
+            >
+              Jadikan urutan manual
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 text-[11px]"
+              onClick={() => setSortColumn("manual")}
+            >
+              Batal
+            </Button>
+          </div>
+        )}
+
+        <div className="ml-auto flex items-center gap-1.5">
+          {error && (
+            <span className="text-[11px] text-[var(--color-blocked)]">{error}</span>
+          )}
+
+          {/* Perubahan hanya ada di memori sampai tombol ini ditekan. */}
+          {pending > 0 ? (
+            <Button
+              size="sm"
+              className="h-7 gap-1.5 text-[12px]"
+              disabled={saving > 0}
+              onClick={() => void save()}
+            >
+              <Save className="size-3.5" />
+              {saving > 0 ? "Menyimpan…" : `Simpan ${pending}`}
+              <span className="opacity-60">⌘S</span>
+            </Button>
+          ) : (
+            <span className="text-[11px] text-[var(--color-faint)]">
+              Tersimpan
+            </span>
+          )}
+
+          {iconButton("Undo (⌘Z)", <Undo2 className="size-3.5" />, undo, !canUndo)}
+          {iconButton("Redo (⇧⌘Z)", <Redo2 className="size-3.5" />, redo, !canRedo)}
+          {iconButton(
+            "Tutup semua (⇧⌘[)",
+            <ChevronsDownUp className="size-3.5" />,
+            () => setAllCollapsed(true),
+          )}
+          {iconButton(
+            "Buka semua (⇧⌘])",
+            <ChevronsUpDown className="size-3.5" />,
+            () => setAllCollapsed(false),
+          )}
+          {iconButton(
+            showDuration ? "Sembunyikan kolom durasi" : "Tampilkan kolom durasi",
+            <Columns3 className="size-3.5" />,
+            toggleDurationColumn,
+          )}
+          {iconButton("Lompat ke hari ini (T)", <Crosshair className="size-3.5" />, onJumpToday)}
+          {iconButton(
+            "Asisten AI",
+            <Sparkles className="size-3.5" />,
+            useStore.getState().toggleChat,
+          )}
+          {iconButton("Setelan", <Settings className="size-3.5" />, () =>
+            useStore.getState().setSettingsOpen(true),
+          )}
+
+          <Tabs value={zoom} onValueChange={(v) => setZoom(v as ZoomUnit)}>
+            <TabsList className="h-7 p-0.5">
+              {ZOOMS.map((z) => (
+                <TabsTrigger key={z.value} value={z.value} className="h-6 px-2 text-[11px]">
+                  {z.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="size-7">
+                <Download className="size-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => {
+                  window.location.href = "/api/backup";
+                }}
+              >
+                Export JSON (lengkap)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportCsv}>Export CSV</DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => {
+                  window.location.href = "/api/export/xlsx";
+                }}
+              >
+                Export XLSX (DTDI)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportMarkdown}>
+                Export Markdown
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => fileRef.current?.click()}>
+                <Upload className="size-3.5" />
+                Import JSON (ganti semua)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="application/json"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void importJson(file);
+              e.target.value = "";
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="flex h-7 items-center gap-4 border-t border-[var(--color-line)] px-3 text-[11px] text-[var(--color-ink-soft)]">
+        <span>{stats.leaves} task</span>
+        <span>{stats.byStatus.in_progress} jalan</span>
+        <span>{stats.byStatus.done} selesai</span>
+        <span
+          className={stats.overdue > 0 ? "text-[var(--color-blocked)]" : undefined}
+        >
+          {stats.overdue} overdue
+        </span>
+        <span>{stats.avgProgress}% rata-rata progres aktif</span>
+        <span>{stats.thisWeek} task minggu ini</span>
+      </div>
+    </header>
+  );
+}
