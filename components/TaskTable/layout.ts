@@ -14,7 +14,7 @@ export type ColKey =
 /** Lebar bawaan tiap kolom, dalam px. */
 export const COL: Record<ColKey, number> = {
   action: 56,
-  wbs: 64,
+  wbs: 92,
   title: 236,
   progress: 92,
   status: 78,
