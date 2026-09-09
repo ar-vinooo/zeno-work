@@ -8,6 +8,3 @@ data/
 # Kunci API & setelan lokal
 .env
 .env.local
-
-# Data pekerjaan asli (sumber `npm run import`)
-docs/data.txt
