@@ -34,7 +34,10 @@ function rollupOf(children: TaskNode[]): Effective {
         : "todo";
 
   return {
-    progress: totalDays ? Math.round(weighted / totalDays) : 0,
+    // Jangan membulatkan naik: 99,8% masih pekerjaan berjalan, bukan Done.
+    // Ini juga memastikan warna status induk saat sebuah anak di-drag tetap
+    // Jalan sampai bobot progresnya benar-benar mencapai 100%.
+    progress: totalDays ? Math.floor(weighted / totalDays) : 0,
     start,
     end,
     status,

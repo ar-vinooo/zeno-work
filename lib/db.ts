@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   "collapsed" INTEGER NOT NULL DEFAULT 0,
   "rollup"    INTEGER NOT NULL DEFAULT 1,
   "notes"     TEXT    NOT NULL DEFAULT '',
+  "repositoryPath" TEXT NOT NULL DEFAULT '',
   "createdAt" TEXT    NOT NULL,
   "updatedAt" TEXT    NOT NULL
 );
@@ -41,6 +42,13 @@ CREATE INDEX IF NOT EXISTS idx_tasks_parent ON tasks("parentId", "order");
 CREATE TABLE IF NOT EXISTS meta (
   "key"   TEXT PRIMARY KEY,
   "value" TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS repo_scans (
+  "taskId"         TEXT PRIMARY KEY REFERENCES tasks("id") ON DELETE CASCADE,
+  "repositoryRoot" TEXT NOT NULL,
+  "head"           TEXT NOT NULL,
+  "fingerprint"    TEXT NOT NULL,
+  "checkedAt"      TEXT NOT NULL
 );
 `;
 
@@ -57,6 +65,14 @@ function open(): DatabaseSync {
   conn.exec("PRAGMA busy_timeout = 5000");
   conn.exec("PRAGMA foreign_keys = ON");
   conn.exec(SCHEMA);
+  // Database lama sudah punya tabel tasks, sehingga CREATE TABLE IF NOT
+  // EXISTS tidak menambahkan kolom baru. Migrasi kecil ini mempertahankan
+  // seluruh task lama dan memberi nilai kosong sebagai bawaan.
+  const taskColumns = conn
+    .prepare(`PRAGMA table_info(tasks)`)
+    .all() as { name: string }[];
+  if (!taskColumns.some((column) => column.name === "repositoryPath"))
+    conn.exec(`ALTER TABLE tasks ADD COLUMN "repositoryPath" TEXT NOT NULL DEFAULT ''`);
   return conn;
 }
 
@@ -105,6 +121,7 @@ const COLUMNS = [
   "collapsed",
   "rollup",
   "notes",
+  "repositoryPath",
   "createdAt",
   "updatedAt",
 ] as const;
@@ -206,6 +223,37 @@ export function setMeta(key: string, value: string): void {
        ON CONFLICT("key") DO UPDATE SET "value" = excluded."value"`,
     )
     .run(key, value);
+}
+
+export interface RepositoryScan {
+  taskId: string;
+  repositoryRoot: string;
+  head: string;
+  fingerprint: string;
+  checkedAt: string;
+}
+
+export function getRepositoryScan(taskId: string): RepositoryScan | null {
+  return (
+    (getDb()
+      .prepare(`SELECT * FROM repo_scans WHERE "taskId" = ?`)
+      .get(taskId) as RepositoryScan | undefined) ?? null
+  );
+}
+
+export function saveRepositoryScan(scan: RepositoryScan): void {
+  getDb()
+    .prepare(
+      `INSERT INTO repo_scans
+         ("taskId", "repositoryRoot", "head", "fingerprint", "checkedAt")
+       VALUES (@taskId, @repositoryRoot, @head, @fingerprint, @checkedAt)
+       ON CONFLICT("taskId") DO UPDATE SET
+         "repositoryRoot" = excluded."repositoryRoot",
+         "head" = excluded."head",
+         "fingerprint" = excluded."fingerprint",
+         "checkedAt" = excluded."checkedAt"`,
+    )
+    .run({ ...scan });
 }
 
 const KEEP_BACKUPS = 7;

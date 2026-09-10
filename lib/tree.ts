@@ -227,6 +227,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     collapsed: false,
     rollup: true,
     notes: "",
+    repositoryPath: "",
     createdAt: now,
     updatedAt: now,
     ...overrides,

@@ -56,6 +56,23 @@ dipakai.
 | `backup:save` / `backup:restore` | Export & import JSON lewat dialog sistem |
 | `export:xlsx` / `export:text` | Lembar Gantt DTDI, CSV, Markdown |
 | `chat:send` | Asisten AI — kunci API dan CLI hanya tersentuh di proses utama |
+| `repository:choose` | Pilih folder Git lokal untuk konteks AI read-only |
+
+### Repository sebagai sumber task AI
+
+Pada setiap baris task, klik ikon Git untuk memilih repository. Ikon yang aktif
+membuka ringkasan branch, HEAD, jumlah perubahan, waktu pemeriksaan AI terakhir,
+serta tombol **Ganti**, **Cek sekarang**, dan **Lepas**. Pengaitan ini menjadi
+bagian dari data task dan baru permanen setelah tombol **Simpan** ditekan.
+Sub-task yang tidak punya repo sendiri otomatis memakai repo milik induknya.
+
+Ketika pengguna berkata “cek Git di 5.7”, ZenoWork mencari repo pada WBS `5.7`,
+lalu naik ke induknya bila belum ada. Aplikasi mengambil branch/status, commit
+baru sejak pemeriksaan sebelumnya, nama berkas berubah, serta potongan diff
+staged/unstaged yang dibatasi. `.env`, credential/key, lockfile, binary, file
+besar, dan isi file untracked tidak dibaca; pola secret umum juga disamarkan.
+ZenoWork tidak dapat menulis, stage, ataupun commit ke repository. AI memakai
+bukti ini untuk membuat usulan task WBS yang tetap harus disimpan pengguna.
 
 ## Membangun
 

@@ -2,6 +2,7 @@ import type { PublicSettings, Settings } from "../lib/settings";
 import type { ChatMessage, ChatReply } from "../lib/chat";
 import type { SyncDiff } from "../lib/sync";
 import type { Task } from "../lib/types";
+import type { RepositorySummary } from "../lib/repository";
 
 /**
  * Kontrak antara halaman dan proses utama.
@@ -20,6 +21,8 @@ export type Channel =
   | "tasks:sync"
   | "settings:get"
   | "settings:set"
+  | "repository:choose"
+  | "repository:status"
   | "backup:save"
   | "backup:restore"
   | "export:xlsx"
@@ -50,6 +53,12 @@ export interface ZenoApi {
   settings: {
     get(): Promise<PublicSettings>;
     set(patch: Partial<Settings>): Promise<PublicSettings>;
+  };
+  repository: {
+    /** Pilih folder Git lokal yang boleh dijadikan konteks asisten. */
+    choose(): Promise<string | null>;
+    /** Status Git saat ini; tidak mengubah penanda pemeriksaan AI terakhir. */
+    status(taskId: string, path: string): Promise<RepositorySummary>;
   };
   backup: {
     /** Tulis backup JSON lewat dialog simpan. */

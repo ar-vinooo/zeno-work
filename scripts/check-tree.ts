@@ -20,6 +20,7 @@ import {
 import { buildOutline } from "../lib/rollup";
 import { computeRows } from "../lib/rows";
 import { EMPTY_FILTERS, type Task } from "../lib/types";
+import { applyRules } from "../lib/validate";
 
 let failures = 0;
 function check(label: string, actual: unknown, expected: unknown) {
@@ -51,9 +52,40 @@ A1.progress = 100;
 tasks = applyPatchList(tasks, [{ id: A1.id, progress: 100, status: "done" }]);
 const rolled = buildOutline(tasks).byId.get(A.id)!;
 check("roll-up rentang induk", [rolled.eff.start, rolled.eff.end], ["2026-01-01", "2026-01-06"]);
-check("roll-up progres berbobot durasi (4h×100 + 2h×0)/6", rolled.eff.progress, 67);
+check("roll-up progres berbobot durasi dibulatkan ke bawah", rolled.eff.progress, 66);
 check("roll-up status campuran", rolled.eff.status, "in_progress");
 check("induk ditandai derived", rolled.derived, true);
+
+// 4 hari × 100% + 1 hari × 99% = 99,8%. Nilai induk harus dibulatkan
+// ke bawah agar belum berganti ke latar Done saat salah satu anak di-drag.
+const P = mk("P", null, 0, "2026-04-01", "2026-04-05");
+const P1 = mk("P1", P.id, 0, "2026-04-01", "2026-04-04");
+const P2 = mk("P2", P.id, 1, "2026-04-05", "2026-04-05");
+P1.progress = 100;
+P1.status = "done";
+P2.progress = 99;
+P2.status = "in_progress";
+check(
+  "roll-up 99,8% dibulatkan ke bawah, belum Done",
+  buildOutline([P, P1, P2]).byId.get(P.id)!.eff.progress,
+  99,
+);
+
+check(
+  "drag progres 1% otomatis menjadi Jalan",
+  applyRules(A2, { id: A2.id, progress: 1 }).status,
+  "in_progress",
+);
+check(
+  "drag progres 0% otomatis menjadi Todo",
+  applyRules(A2, { id: A2.id, progress: 0 }).status,
+  "todo",
+);
+check(
+  "drag progres 100% otomatis menjadi Done",
+  applyRules(A2, { id: A2.id, progress: 100 }).status,
+  "done",
+);
 
 // Indent B → jadi anak terakhir A
 tasks = applyPatchList(tasks, indent(tasks, B.id));
@@ -103,6 +135,24 @@ check(
   "hasil kalender hanya berisi task yang cocok, bukan leluhur konteks",
   filtered.matchedNodes.map((n) => n.wbs),
   ["2.2"],
+);
+
+// Fokus cabang mengalahkan filter biasa dan juga membuka anak yang collapsed,
+// supaya satu WBS bisa direview utuh termasuk task yang sudah Done.
+const focusRows = computeRows(
+  applyPatchList(tasks, [{ id: A.id, collapsed: true }]),
+  { ...EMPTY_FILTERS, hideDone: true },
+  A.id,
+);
+check(
+  "fokus cabang menampilkan induk dan semua child meski Done atau collapsed",
+  focusRows.rows.map((r) => r.wbs),
+  ["2", "2.1", "2.2"],
+);
+check(
+  "kalender fokus cabang menerima seluruh child",
+  focusRows.matchedNodes.map((n) => n.wbs),
+  ["2", "2.1", "2.2"],
 );
 
 // Collapse menyembunyikan keturunan tapi induk tetap ada

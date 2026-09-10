@@ -17,6 +17,8 @@ export interface Task {
   /** true = progres & tanggal induk dihitung dari anak (§4.3 PRD). */
   rollup: boolean;
   notes: string;
+  /** Folder Git lokal milik task ini. Anak mewarisi milik induk saat kosong. */
+  repositoryPath: string;
   createdAt: string;
   updatedAt: string;
 }

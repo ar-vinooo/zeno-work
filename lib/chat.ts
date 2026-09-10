@@ -12,9 +12,14 @@ import { runClaudeCli, runCodexCli, stripFence } from "./ai-cli";
 import { readSettings } from "./settings";
 import { durationOf, todayISO } from "./dates";
 import { isOverdue } from "./derive";
-import { listTasks } from "./db";
+import {
+  getRepositoryScan,
+  listTasks,
+  saveRepositoryScan,
+} from "./db";
 import { buildOutline } from "./rollup";
 import { STATUS_LABEL } from "./types";
+import { inspectRepository } from "./repository";
 
 /**
  * Asisten AI. Berjalan di proses utama Electron, bukan di renderer: kunci API
@@ -77,6 +82,7 @@ function outlineText(): string {
     const flags = [
       n.derived ? "induk" : null,
       isOverdue(n.eff, today) ? "OVERDUE" : null,
+      n.task.repositoryPath ? "Git" : null,
     ].filter(Boolean);
     return `${n.wbs}\t${n.task.title}\t${n.eff.progress}%\t${n.eff.start}..${n.eff.end}\t${durationOf(n.eff.start, n.eff.end)}h\t${STATUS_LABEL[n.eff.status]}${flags.length ? `\t[${flags.join(",")}]` : ""}`;
   });
@@ -90,6 +96,106 @@ Daftar lengkap (wbs, judul, progres, mulai..selesai, durasi, status):
 ${lines.join("\n")}`;
 }
 
+const GIT_INTENT = /\b(git|repo|repository|commit|commitan|branch|kode)\b/i;
+
+/**
+ * Temukan repo dari nomor WBS dalam pesan terakhir. Tautan langsung menang;
+ * bila kosong, naik ke induk sampai menemukan repo yang diwariskan.
+ */
+export async function gitContextFor(messages: ChatMessage[]): Promise<string> {
+  const latest = [...messages].reverse().find((message) => message.role === "user")
+    ?.content ?? "";
+  if (!GIT_INTENT.test(latest)) return "";
+
+  const outline = buildOutline(listTasks());
+  const byWbs = new Map(outline.all.map((node) => [node.wbs, node]));
+  const mentioned = [
+    ...new Set(
+      [...latest.matchAll(/\b\d+(?:\.\d+){0,2}\b/g)]
+        .map((match) => match[0])
+        .filter((wbs) => byWbs.has(wbs)),
+    ),
+  ];
+
+  const inherited = (wbs: string) => {
+    let node = byWbs.get(wbs);
+    while (node) {
+      const path = node.task.repositoryPath.trim();
+      if (path) return { path, ownerWbs: node.wbs };
+      node = node.task.parentId ? outline.byId.get(node.task.parentId) : undefined;
+    }
+    return null;
+  };
+
+  const directBindings = outline.all
+    .filter((node) => node.task.repositoryPath.trim())
+    .map((node) => ({
+      id: node.task.id,
+      wbs: node.wbs,
+      title: node.task.title,
+      path: node.task.repositoryPath.trim(),
+    }));
+
+  if (mentioned.length === 0) {
+    const paths = [...new Set(directBindings.map((binding) => binding.path))];
+    if (paths.length === 0)
+      return "KONTEKS GIT: belum ada task yang ditautkan ke repository. Minta pengguna menautkannya lewat ikon Git pada baris task.";
+    if (paths.length > 1)
+      return `KONTEKS GIT: ada beberapa repository. Minta pengguna menyebut nomor WBS yang ingin diperiksa.\n${directBindings
+        .map((binding) => `${binding.wbs}\t${binding.title}\t${binding.path}`)
+        .join("\n")}`;
+    const binding = directBindings.find((item) => item.path === paths[0])!;
+    const previous = getRepositoryScan(binding.id);
+    const inspection = await inspectRepository(binding.path, previous);
+    saveRepositoryScan({
+      taskId: binding.id,
+      ...inspection.snapshot,
+      checkedAt: new Date().toISOString(),
+    });
+    const context = inspection.context;
+    return `Repository dipilih dari tautan WBS ${binding.wbs} (${binding.title}).\n\n${context}`;
+  }
+
+  const missing: string[] = [];
+  const selected = new Map<
+    string,
+    { ownerId: string; ownerWbs: string; requestedWbs: string[] }
+  >();
+  for (const wbs of mentioned) {
+    const found = inherited(wbs);
+    if (!found) {
+      missing.push(wbs);
+      continue;
+    }
+    const current = selected.get(found.path);
+    if (current) current.requestedWbs.push(wbs);
+    else
+      selected.set(found.path, {
+        ownerId: byWbs.get(found.ownerWbs)!.task.id,
+        ownerWbs: found.ownerWbs,
+        requestedWbs: [wbs],
+      });
+  }
+
+  const contexts = await Promise.all(
+    [...selected.entries()].map(async ([path, info]) => {
+      const previous = getRepositoryScan(info.ownerId);
+      const inspection = await inspectRepository(path, previous);
+      saveRepositoryScan({
+        taskId: info.ownerId,
+        ...inspection.snapshot,
+        checkedAt: new Date().toISOString(),
+      });
+      return `Repository untuk WBS ${info.requestedWbs.join(", ")} (tautan berasal dari ${info.ownerWbs}):\n\n${inspection.context}`;
+    }),
+  );
+  if (missing.length)
+    contexts.push(
+      `WBS ${missing.join(", ")} belum memiliki repository sendiri maupun warisan dari induknya.`,
+    );
+  return contexts.join("\n\n---\n\n");
+}
+
 interface CliReply {
   reply?: string;
   operations?: AiOperation[];
@@ -98,6 +204,7 @@ interface CliReply {
 async function viaCli(
   messages: ChatMessage[],
   provider: "claude-cli" | "codex-cli",
+  repoContext: string,
 ): Promise<ChatReply> {
   const settings = readSettings();
 
@@ -106,7 +213,7 @@ async function viaCli(
   const transcript = messages
     .map((m) => `${m.role === "user" ? "Pengguna" : "Kamu"}: ${m.content}`)
     .join("\n\n");
-  const prompt = `${dateContext()}\n\n${outlineText()}\n\n---\n\n${transcript}`;
+  const prompt = `${dateContext()}\n\n${outlineText()}${repoContext ? `\n\n${repoContext}` : ""}\n\n---\n\n${transcript}`;
 
   const system = `${SYSTEM_INSTRUCTIONS}\n${CLI_OUTPUT_CONTRACT}`;
 
@@ -146,8 +253,9 @@ export async function runChat(messages: ChatMessage[]): Promise<ChatReply> {
   if (messages.length === 0) throw new Error("Tidak ada pesan");
 
   const settings = readSettings();
+  const repoContext = await gitContextFor(messages);
   if (settings.aiProvider === "claude-cli" || settings.aiProvider === "codex-cli")
-    return viaCli(messages, settings.aiProvider);
+    return viaCli(messages, settings.aiProvider, repoContext);
 
   if (!settings.anthropicApiKey)
     throw new Error(
@@ -173,6 +281,9 @@ export async function runChat(messages: ChatMessage[]): Promise<ChatReply> {
       text: outlineText(),
       cache_control: { type: "ephemeral" },
     },
+    ...(repoContext
+      ? [{ type: "text" as const, text: repoContext, cache_control: { type: "ephemeral" as const } }]
+      : []),
     { type: "text", text: dateContext() },
   ];
   const READ_NAMES = new Set(READ_TOOLS.map((t) => t.name));

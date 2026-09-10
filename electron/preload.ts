@@ -24,6 +24,10 @@ const api: ZenoApi = {
     get: () => invoke("settings:get"),
     set: (patch) => invoke("settings:set", patch),
   },
+  repository: {
+    choose: () => invoke("repository:choose"),
+    status: (taskId, path) => invoke("repository:status", taskId, path),
+  },
   backup: {
     save: () => invoke("backup:save"),
     restore: (tasks) => invoke("backup:restore", tasks),

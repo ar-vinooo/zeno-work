@@ -14,20 +14,19 @@ export function applyRules(current: Task, patch: Patch): Patch {
   if (next.status !== undefined && !STATUSES.includes(next.status))
     delete next.status;
 
-  const status = next.status ?? current.status;
-  const progress = next.progress ?? current.progress;
-
-  // status → progress
-  if (next.status === "done") next.progress = 100;
-  // progress → status
-  else if (next.progress === 100 && status !== "blocked") next.status = "done";
-  else if (
-    next.progress !== undefined &&
-    next.progress < 100 &&
-    current.status === "done" &&
-    next.status === undefined
-  )
-    next.status = progress > 0 ? "in_progress" : "todo";
+  // Progress → status. Jalur ini dipakai juga saat progress bar diseret,
+  // sehingga status dan latar pil tidak tertinggal di Todo setelah naik 1%.
+  // Status `blocked` yang dipilih manual tetap ada sampai progresnya diubah.
+  if (next.progress !== undefined) {
+    next.status =
+      next.progress <= 0
+        ? "todo"
+        : next.progress >= 100
+          ? "done"
+          : "in_progress";
+  }
+  // status → progress untuk pilihan Done di dropdown.
+  else if (next.status === "done") next.progress = 100;
 
   // end >= start. Ujung yang TIDAK sedang diedit yang mengalah.
   let start = next.start ?? current.start;
@@ -71,6 +70,11 @@ export function sanitizeImport(tasks: Task[]): Task[] {
       seen.add(cursor);
       cursor = byId.get(cursor)?.parentId ?? null;
     }
-    return { ...t, parentId };
+    return {
+      ...t,
+      parentId,
+      repositoryPath:
+        typeof t.repositoryPath === "string" ? t.repositoryPath : "",
+    };
   });
 }

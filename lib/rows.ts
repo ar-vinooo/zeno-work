@@ -64,14 +64,28 @@ export interface RowsResult {
  * cocok ikut ditampilkan sebagai konteks (§5.6 PRD) — kalau tidak, hasil
  * pencarian bisa tersembunyi di dalam induk yang kebetulan tertutup.
  */
-export function computeRows(tasks: Task[], filters: Filters): RowsResult {
+export function computeRows(
+  tasks: Task[],
+  filters: Filters,
+  focusRootId: string | null = null,
+): RowsResult {
   const today = todayISO();
   const outline = buildOutline(tasks);
-  const filtering = filterActive(filters);
+  const focusRoot = focusRootId ? outline.byId.get(focusRootId) : undefined;
+  // Fokus cabang sengaja mengalahkan filter biasa: pemilik harus bisa melihat
+  // satu WBS lengkap sampai daun, termasuk yang sudah Done.
+  const filtering = filterActive(filters) || !!focusRoot;
 
   const matched = new Set<string>();
   const visible = new Set<string>();
-  if (filtering) {
+  if (focusRoot) {
+    const markBranch = (node: TaskNode) => {
+      matched.add(node.task.id);
+      visible.add(node.task.id);
+      for (const child of node.children) markBranch(child);
+    };
+    markBranch(focusRoot);
+  } else if (filtering) {
     for (const node of outline.all)
       if (matches(node, filters, today)) matched.add(node.task.id);
     const mark = (node: TaskNode, ancestors: string[]) => {
@@ -93,11 +107,14 @@ export function computeRows(tasks: Task[], filters: Filters): RowsResult {
     for (const node of nodes) {
       const id = node.task.id;
       if (filtering && !visible.has(id)) continue;
-      rows.push({ ...node, contextOnly: filtering && !matched.has(id) });
+      rows.push({
+        ...node,
+        contextOnly: !focusRoot && filtering && !matched.has(id),
+      });
       if (filtering || !node.task.collapsed) walk(node.children);
     }
   };
-  walk(outline.roots);
+  walk(focusRoot ? [focusRoot] : outline.roots);
 
   const byStatus: Record<Status, number> = {
     todo: 0,

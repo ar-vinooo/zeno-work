@@ -18,7 +18,7 @@
     "desktop:dist:mac": "npm run build && npm run electron:build && electron-builder --mac",
     "desktop:dist:win": "npm run build && npm run electron:build && electron-builder --win --x64",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.electron.json --noEmit",
-    "test": "tsx scripts/check-tree.ts",
+    "test": "tsx scripts/check-tree.ts && tsx scripts/check-repository.ts",
     "test:desktop": "npm run build && npm run electron:build && tsx scripts/smoke-desktop.ts",
     "import": "tsx scripts/import-outline.ts"
   },

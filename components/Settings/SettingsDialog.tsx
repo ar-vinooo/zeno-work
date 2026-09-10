@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -117,10 +116,6 @@ export default function SettingsDialog() {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Setelan</DialogTitle>
-          <DialogDescription>
-            Tersimpan di database aplikasi, bukan di berkas .env — jadi berlaku
-            langsung tanpa membuka ulang aplikasi.
-          </DialogDescription>
         </DialogHeader>
 
         {!data ? (

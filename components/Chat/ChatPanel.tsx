@@ -28,6 +28,7 @@ const WIDTH_MAX = 720;
 const CONTOH = [
   "Tambah sub-task 'Uji coba' di 15.6",
   "Set progres 5.7 jadi 80%",
+  "Cek Git di 5.7 lalu buatkan task tindak lanjut dari update terbaru",
   "Mana saja yang overdue?",
 ];
 

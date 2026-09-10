@@ -1,6 +1,7 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
+import { FolderGit2, RefreshCw, Unlink } from "lucide-react";
 import { INDENT, ROW_H, widthOf } from "./layout";
 import { Editable, ProgressTrack } from "./cells";
 import DateCell from "./DateCell";
@@ -15,6 +16,14 @@ import { isOverdue } from "@/lib/derive";
 import { applyPreview } from "@/lib/preview";
 import { xForDate, type Scale } from "@/lib/schedule";
 import { useStore, type CellRef, type DragMode } from "@/lib/store";
+import { zeno } from "@/lib/bridge";
+import { Button } from "@/components/animate-ui/components/buttons/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import type { RepositorySummary } from "@/lib/repository";
 import { STATUS_LABEL } from "@/lib/types";
 import type { Row, Status } from "@/lib/types";
 
@@ -65,6 +74,18 @@ const STATUS_PILL: Record<Status, { bg: string; fg: string; dot: string }> = {
   },
 };
 
+/**
+ * Warna latar status mengikuti kemajuan nyata, bukan status yang terakhir
+ * dipilih. Dengan begitu 0% selalu terasa sebagai Todo, progres parsial
+ * sebagai Jalan, dan 100% sebagai Done. Status Blocked tetap dipertahankan
+ * sebagai teks/titik merah agar hambatan tidak hilang dari informasi task.
+ */
+function backgroundStatus(progress: number): Exclude<Status, "blocked"> {
+  if (progress <= 0) return "todo";
+  if (progress >= 100) return "done";
+  return "in_progress";
+}
+
 function TaskRow({
   row,
   scale,
@@ -85,10 +106,46 @@ function TaskRow({
   const toggleCollapse = useStore((s) => s.toggleCollapse);
   const addChildOf = useStore((s) => s.addChildOf);
   const addSiblingAfter = useStore((s) => s.addSiblingAfter);
+  const setFocusRoot = useStore((s) => s.setFocusRoot);
   const preview = useStore((s) => s.preview);
   const aiEdited = useStore((s) => s.aiTouched.includes(row.task.id));
 
   const { task } = row;
+  const [repoOpen, setRepoOpen] = useState(false);
+  const [repoSummary, setRepoSummary] = useState<RepositorySummary | null>(null);
+  const [repoLoading, setRepoLoading] = useState(false);
+  const [repoError, setRepoError] = useState<string | null>(null);
+
+  const loadRepositoryStatus = async (path = task.repositoryPath) => {
+    if (!path || repoLoading) return;
+    setRepoLoading(true);
+    setRepoError(null);
+    try {
+      setRepoSummary(await zeno().repository.status(task.id, path));
+    } catch (error) {
+      setRepoError(
+        error instanceof Error ? error.message : "Gagal membaca status Git.",
+      );
+    } finally {
+      setRepoLoading(false);
+    }
+  };
+
+  const chooseRepository = async () => {
+    try {
+      const selected = await zeno().repository.choose();
+      if (selected) {
+        patchTask(task.id, { repositoryPath: selected });
+        setRepoOpen(true);
+        setRepoSummary(null);
+        await loadRepositoryStatus(selected);
+      }
+    } catch (error) {
+      window.alert(
+        error instanceof Error ? error.message : "Gagal memilih repository Git.",
+      );
+    }
+  };
   const display = applyPreview(row.eff, task.id, preview);
   const previewing =
     !!preview && preview.days !== 0 && preview.ids.includes(task.id);
@@ -96,6 +153,7 @@ function TaskRow({
   const overdue = isOverdue(display);
   const hasChildren = row.children.length > 0;
   const readOnly = row.derived;
+  const statusBackground = STATUS_PILL[backgroundStatus(display.progress)].bg;
   const today = todayISO();
   // Latar berdasarkan tingkat, dipakai baris sekaligus panel kirinya yang
   // menempel — keduanya harus sewarna supaya pitanya tidak terputus saat
@@ -146,7 +204,7 @@ function TaskRow({
       >
         {/* Action: tombol baris, muncul saat baris di-hover */}
         <div
-          className="cell shrink-0 gap-0.5 text-[11px] text-[var(--color-faint)]"
+          className="cell shrink-0 gap-1 text-[11px] text-[var(--color-faint)]"
           style={{ width: widthOf("action") }}
         >
           <button
@@ -188,6 +246,134 @@ function TaskRow({
           >
             ×
           </button>
+          <button
+            className={`w-3 shrink-0 text-center text-[12px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 ${
+              hasChildren ? "" : "invisible pointer-events-none"
+            }`}
+            title={
+              hasChildren
+                ? `Fokus ke ${row.wbs} dan seluruh sub-task-nya`
+                : undefined
+            }
+            aria-label={
+              hasChildren
+                ? `Fokus ke ${row.wbs} dan seluruh sub-task-nya`
+                : undefined
+            }
+            aria-hidden={!hasChildren}
+            tabIndex={hasChildren ? 0 : -1}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (hasChildren) setFocusRoot(task.id);
+            }}
+          >
+            ◎
+          </button>
+          {task.repositoryPath ? (
+            <Popover
+              open={repoOpen}
+              onOpenChange={(next) => {
+                setRepoOpen(next);
+                if (next) void loadRepositoryStatus();
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  className="w-3 shrink-0 text-center leading-none text-[var(--color-mark)]"
+                  title={`Git: ${task.repositoryPath}`}
+                  aria-label={`Status repository Git untuk ${row.wbs}`}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <FolderGit2 className="size-3" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="start"
+                className="w-80 border border-[var(--color-line)] bg-[var(--color-surface)] text-[11px] text-[var(--color-ink)]"
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                <div className="font-semibold">Git · {row.wbs} {task.title}</div>
+                <div className="break-all text-[10px] text-[var(--color-faint)]">
+                  {task.repositoryPath}
+                </div>
+                {repoLoading && !repoSummary ? (
+                  <div className="text-[var(--color-faint)]">membaca Git…</div>
+                ) : repoError ? (
+                  <div className="text-[var(--color-blocked)]">{repoError}</div>
+                ) : repoSummary ? (
+                  <div className="grid grid-cols-[72px_1fr] gap-x-2 gap-y-1 rounded bg-[var(--color-raised)] p-2">
+                    <span className="text-[var(--color-faint)]">Branch</span>
+                    <span className="num truncate">{repoSummary.branch}</span>
+                    <span className="text-[var(--color-faint)]">HEAD</span>
+                    <span className="num">{repoSummary.shortHead}</span>
+                    <span className="text-[var(--color-faint)]">Perubahan</span>
+                    <span>
+                      {repoSummary.changedFiles} file · {repoSummary.stagedFiles} staged ·{" "}
+                      {repoSummary.untrackedFiles} untracked
+                    </span>
+                    <span className="text-[var(--color-faint)]">Cek AI terakhir</span>
+                    <span>
+                      {repoSummary.lastCheckedAt
+                        ? new Date(repoSummary.lastCheckedAt).toLocaleString("id-ID")
+                        : "Belum pernah"}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-[11px]"
+                    onClick={() => void chooseRepository()}
+                  >
+                    Ganti
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 gap-1 text-[11px]"
+                    disabled={repoLoading}
+                    onClick={() => void loadRepositoryStatus()}
+                  >
+                    <RefreshCw className={`size-3 ${repoLoading ? "animate-spin" : ""}`} />
+                    Cek sekarang
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 text-[11px] text-[var(--color-blocked)]"
+                    onClick={() => {
+                      patchTask(task.id, { repositoryPath: "" });
+                      setRepoOpen(false);
+                      setRepoSummary(null);
+                    }}
+                  >
+                    <Unlink className="size-3" />
+                    Lepas
+                  </Button>
+                </div>
+                <div className="text-[10px] text-[var(--color-faint)]">
+                  Sub-task tanpa repo sendiri otomatis memakai repository ini.
+                </div>
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <button
+              className="w-3 shrink-0 text-center leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100"
+              title="Tautkan repository Git ke task ini"
+              aria-label={`Tautkan repository Git ke ${row.wbs}`}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                void chooseRepository();
+              }}
+            >
+              <FolderGit2 className="size-3" />
+            </button>
+          )}
         </div>
 
         {/* Nomor WBS + expand/collapse, sekaligus handle pemindah baris */}
@@ -290,7 +476,7 @@ function TaskRow({
           <span
             className="relative inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-[2px]"
             style={{
-              background: STATUS_PILL[display.status].bg,
+              background: statusBackground,
               color: STATUS_PILL[display.status].fg,
             }}
             title={readOnly ? "Dihitung dari sub-task" : undefined}

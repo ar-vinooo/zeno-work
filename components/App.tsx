@@ -32,6 +32,7 @@ export default function App() {
   const hydrated = useStore((s) => s.hydrated);
   const [loadError, setLoadError] = useState<string | null>(null);
   const filters = useStore((s) => s.filters);
+  const focusRootId = useStore((s) => s.focusRootId);
   const zoom = useStore((s) => s.zoom);
   const store = useStore;
 
@@ -65,8 +66,8 @@ export default function App() {
   }, [hydrate]);
 
   const { rows, matchedNodes, stats, outline } = useMemo(
-    () => computeRows(tasks, filters),
-    [tasks, filters],
+    () => computeRows(tasks, filters, focusRootId),
+    [tasks, filters, focusRootId],
   );
 
   const scale = useMemo(() => {
@@ -334,7 +335,18 @@ export default function App() {
       <SettingsDialog />
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          // Default Radix mengarahkan fokus ke Batal. Untuk dialog hapus ini,
+          // tombol Hapus sengaja menjadi fokus awal agar Enter mengonfirmasi
+          // aksi yang baru saja diminta; Esc tetap membatalkan.
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            const content = event.currentTarget as HTMLElement | null;
+            content
+              ?.querySelector<HTMLElement>('[data-slot="alert-dialog-action"]')
+              ?.focus();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>
               {deleteTarget.rows > 1

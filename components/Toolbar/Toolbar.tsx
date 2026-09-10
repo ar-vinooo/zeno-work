@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronsDownUp,
@@ -57,6 +57,7 @@ import { buildOutline } from "@/lib/rollup";
 import { durationOf, todayISO } from "@/lib/dates";
 import {
   RANGE_LABEL,
+  PRIORITY_LABEL,
   STATUS_LABEL,
   type DateRange,
   type Status,
@@ -112,6 +113,8 @@ export default function Toolbar({
   const filters = useStore((s) => s.filters);
   const setFilters = useStore((s) => s.setFilters);
   const resetFilters = useStore((s) => s.resetFilters);
+  const focusRootId = useStore((s) => s.focusRootId);
+  const setFocusRoot = useStore((s) => s.setFocusRoot);
   const zoom = useStore((s) => s.zoom);
   const setZoom = useStore((s) => s.setZoom);
   const setAllCollapsed = useStore((s) => s.setAllCollapsed);
@@ -130,6 +133,36 @@ export default function Toolbar({
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  // Filter tidak boleh menjadi keadaan tersembunyi di dalam dropdown. Saat
+  // hasil tabel berubah, ringkasan ini tetap terlihat di toolbar agar jelas
+  // mengapa sebagian task tidak sedang ditampilkan.
+  const activeFilterLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (filters.range !== "all") {
+      labels.push(
+        filters.range === "from" && filters.fromDate
+          ? `Sejak ${filters.fromDate}`
+          : RANGE_LABEL[filters.range],
+      );
+    }
+    if (filters.activeOnly) labels.push("Hanya aktif");
+    if (filters.hideDone) labels.push("Done disembunyikan");
+    if (filters.overdueOnly) labels.push("Overdue saja");
+    if (filters.status.length)
+      labels.push(`Status: ${filters.status.map((s) => STATUS_LABEL[s]).join(", ")}`);
+    if (filters.priority.length)
+      labels.push(
+        `Prioritas: ${filters.priority.map((p) => PRIORITY_LABEL[p]).join(", ")}`,
+      );
+    return labels;
+  }, [filters]);
+
+  const focusNode = useMemo(
+    () =>
+      focusRootId ? buildOutline(tasks).byId.get(focusRootId) ?? null : null,
+    [focusRootId, tasks],
+  );
 
   const exportCsv = () => {
     const outline = buildOutline(tasks);
@@ -337,6 +370,52 @@ export default function Toolbar({
             <DropdownMenuItem onClick={resetFilters}>Reset filter</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        {focusNode && (
+          <div
+            className="flex min-w-0 items-center gap-1 rounded bg-[var(--color-mark)]/15 px-1.5 py-0.5 text-[11px] text-[var(--color-mark)]"
+            title="Fokus cabang menampilkan task ini dan seluruh sub-task, termasuk yang Done. Filter biasa ditangguhkan."
+          >
+            <Crosshair className="size-3 shrink-0" />
+            <span className="truncate">
+              Fokus: {focusNode.wbs} {focusNode.task.title}
+            </span>
+            <button
+              type="button"
+              className="shrink-0 text-[13px] leading-none hover:text-[var(--color-blocked)]"
+              title="Keluar dari Fokus Cabang"
+              aria-label="Keluar dari Fokus Cabang"
+              onClick={() => setFocusRoot(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {activeFilterLabels.length > 0 && (
+          <div
+            className="flex min-w-0 items-center gap-1 overflow-x-auto text-[11px]"
+            aria-label={`Filter aktif: ${activeFilterLabels.join(", ")}`}
+          >
+            {activeFilterLabels.map((label) => (
+              <span
+                key={label}
+                className="shrink-0 rounded bg-[var(--color-mark)]/10 px-1.5 py-0.5 text-[var(--color-mark)]"
+              >
+                {label}
+              </span>
+            ))}
+            <button
+              type="button"
+              className="shrink-0 text-[var(--color-faint)] hover:text-[var(--color-blocked)]"
+              title="Reset semua filter"
+              aria-label="Reset semua filter"
+              onClick={resetFilters}
+            >
+              ×
+            </button>
+          </div>
+        )}
 
 
         <div className="ml-auto flex items-center gap-1.5">

@@ -1,10 +1,11 @@
 import { BrowserWindow, dialog, ipcMain } from "electron";
 import { writeFile } from "node:fs/promises";
-import { listTasks } from "../lib/db";
+import { getRepositoryScan, listTasks } from "../lib/db";
 import { runChat, type ChatMessage } from "../lib/chat";
 import { publicSettings, writeSettings, type Settings } from "../lib/settings";
 import { backupPayload, importTasks, syncTasks, type SyncDiff } from "../lib/sync";
 import { buildTimelineWorkbook, xlsxFileName } from "../lib/xlsx";
+import { inspectRepository, repositoryRoot } from "../lib/repository";
 import type { Channel, Envelope, SaveResult } from "./api";
 
 /**
@@ -84,6 +85,20 @@ export function registerIpc(): void {
   handle("settings:set", (patch: Partial<Settings>) => {
     writeSettings(settingsPatch(patch ?? {}));
     return publicSettings();
+  });
+  handle("repository:choose", async () => {
+    const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    const result = parent
+      ? await dialog.showOpenDialog(parent, { properties: ["openDirectory"] })
+      : await dialog.showOpenDialog({ properties: ["openDirectory"] });
+    if (result.canceled || !result.filePaths[0]) return null;
+    // Simpan root Git kanonis, walau pengguna memilih sub-folder proyek.
+    return repositoryRoot(result.filePaths[0]);
+  });
+  handle("repository:status", async (taskId: string, path: string) => {
+    if (typeof taskId !== "string" || typeof path !== "string" || !path.trim())
+      throw new Error("Task dan folder repository wajib diisi.");
+    return (await inspectRepository(path, getRepositoryScan(taskId))).summary;
   });
 
   handle("backup:save", () =>

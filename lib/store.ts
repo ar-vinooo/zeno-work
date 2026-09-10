@@ -42,6 +42,7 @@ const COMPARED: (keyof Task)[] = [
   "priority",
   "rollup",
   "notes",
+  "repositoryPath",
 ];
 
 function diffTasks(prev: Task[], next: Task[]): Diff {
@@ -125,6 +126,8 @@ interface Store {
   anchorId: string | null;
   editing: CellRef | null;
   filters: Filters;
+  /** Akar WBS yang sedang ditampilkan beserta seluruh turunannya. */
+  focusRootId: string | null;
   zoom: ZoomUnit;
   showDuration: boolean;
   chatOpen: boolean;
@@ -161,6 +164,7 @@ interface Store {
   refresh: () => Promise<void>;
   setFilters: (patch: Partial<Filters>) => void;
   resetFilters: () => void;
+  setFocusRoot: (id: string | null) => void;
   setZoom: (zoom: ZoomUnit) => void;
   toggleDurationColumn: () => void;
   toggleChat: () => void;
@@ -198,6 +202,7 @@ export const useStore = create<Store>((set, get) => {
     anchorId: null,
     editing: null,
     filters: EMPTY_FILTERS,
+    focusRootId: null,
     zoom: "week",
     showDuration: false,
     chatOpen: false,
@@ -219,6 +224,7 @@ export const useStore = create<Store>((set, get) => {
         aiTouched: [],
         past: [],
         future: [],
+        focusRootId: null,
       });
     },
 
@@ -285,6 +291,8 @@ export const useStore = create<Store>((set, get) => {
         error: null,
         selection: s.selection.filter((id) => alive.has(id)),
         anchorId: s.anchorId && alive.has(s.anchorId) ? s.anchorId : null,
+        focusRootId:
+          s.focusRootId && alive.has(s.focusRootId) ? s.focusRootId : null,
       }));
     },
 
@@ -325,7 +333,15 @@ export const useStore = create<Store>((set, get) => {
         );
       }
       commit(tasks);
-      set({ selection: [], anchorId: null, editing: null });
+      set((s) => ({
+        selection: [],
+        anchorId: null,
+        editing: null,
+        focusRootId:
+          s.focusRootId && tasks.some((task) => task.id === s.focusRootId)
+            ? s.focusRootId
+            : null,
+      }));
     },
 
     indentSelected: () => {
@@ -450,11 +466,13 @@ export const useStore = create<Store>((set, get) => {
         past: [],
         future: [],
         selection: [],
+        focusRootId: null,
       });
     },
 
     setFilters: (patch) => set((s) => ({ filters: { ...s.filters, ...patch } })),
     resetFilters: () => set({ filters: EMPTY_FILTERS }),
+    setFocusRoot: (focusRootId) => set({ focusRootId }),
     setZoom: (zoom) => set({ zoom }),
     toggleDurationColumn: () => set((s) => ({ showDuration: !s.showDuration })),
     toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
