@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +11,6 @@ import {
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import { zeno } from "@/lib/bridge";
 import { useStore } from "@/lib/store";
-import { useThemeMode, type ThemeMode } from "@/lib/theme";
 import type { AiProvider, PublicSettings } from "@/lib/settings";
 
 const MODELS = [
@@ -51,16 +49,10 @@ const CODEX_EFFORTS = [
 const field =
   "h-8 w-full rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 text-[12px] outline-none focus:border-[var(--color-mark)]";
 const label = "mb-1 block text-[11px] font-medium text-[var(--color-ink-soft)]";
-const THEMES: { id: ThemeMode; label: string; icon: typeof Monitor }[] = [
-  { id: "system", label: "System", icon: Monitor },
-  { id: "light", label: "Light", icon: Sun },
-  { id: "dark", label: "Dark", icon: Moon },
-];
 
 export default function SettingsDialog() {
   const open = useStore((s) => s.settingsOpen);
   const setOpen = useStore((s) => s.setSettingsOpen);
-  const theme = useThemeMode();
 
   const [data, setData] = useState<PublicSettings | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -130,27 +122,6 @@ export default function SettingsDialog() {
           <div className="text-[12px] text-[var(--color-faint)]">memuat…</div>
         ) : (
           <div className="space-y-3">
-            <div>
-              <span className={label}>Tema tampilan</span>
-              <div className="grid grid-cols-3 gap-1.5">
-                {THEMES.map(({ id, label: title, icon: Icon }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => theme.setMode(id)}
-                    className={`flex h-8 items-center justify-center gap-1.5 rounded-md border px-2 text-[12px] ${
-                      theme.mode === id
-                        ? "border-[var(--color-mark)] bg-[var(--color-mark-soft)] text-[var(--color-mark)]"
-                        : "border-[var(--color-line)] text-[var(--color-ink-soft)] hover:border-[var(--color-mark)] hover:text-[var(--color-ink)]"
-                    }`}
-                  >
-                    <Icon className="size-3.5" />
-                    {title}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div>
               <span className={label}>Sumber jawaban Asisten</span>
               <div className="grid grid-cols-3 gap-1.5">
