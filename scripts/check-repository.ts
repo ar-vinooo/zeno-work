@@ -11,9 +11,12 @@ function check(label: string, ok: boolean) {
 }
 
 const fixture = mkdtempSync(path.join(tmpdir(), "zenowork-repository-"));
+const secondFixture = mkdtempSync(path.join(tmpdir(), "zenowork-repository-"));
 const dataDir = mkdtempSync(path.join(tmpdir(), "zenowork-repository-db-"));
-const git = (...args: string[]) =>
-  execFileSync("git", args, { cwd: fixture, encoding: "utf8" }).trim();
+const runGit = (cwd: string, ...args: string[]) =>
+  execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+const git = (...args: string[]) => runGit(fixture, ...args);
+const gitSecond = (...args: string[]) => runGit(secondFixture, ...args);
 
 async function main() {
   process.env.ZENO_DATA_DIR = dataDir;
@@ -26,6 +29,12 @@ async function main() {
     writeFileSync(path.join(fixture, "package-lock.json"), '{"lockfileVersion":3}\n');
     git("add", ".");
     git("commit", "-qm", "feat: initial app");
+    gitSecond("init", "-q");
+    gitSecond("config", "user.name", "ZenoWork Test");
+    gitSecond("config", "user.email", "test@localhost");
+    writeFileSync(path.join(secondFixture, "backend.ts"), "export const api = true;\n");
+    gitSecond("add", ".");
+    gitSecond("commit", "-qm", "feat: initial backend");
 
     const first = await inspectRepository(fixture);
     const previous = {
@@ -73,9 +82,47 @@ async function main() {
     ]);
     check("sub-task mewarisi repo induk", context.includes("tautan berasal dari 1"));
     check("cek AI menyimpan snapshot induk", db.getRepositoryScan(parent.id) !== null);
+
+    const draft = tree.makeTask({
+      title: "Task live belum disimpan",
+      repositoryPath: fixture,
+    });
+    const liveContext = await chat.gitContextFor(
+      [{ role: "user", content: "cek git di 1" }],
+      [draft],
+    );
+    check(
+      "AI membaca repo dari snapshot editor sebelum simpan",
+      liveContext.includes("Repository untuk WBS 1"),
+    );
+    const followUpContext = await chat.gitContextFor([
+      { role: "user", content: "cek git di 1.1" },
+      { role: "assistant", content: "Konteks Git sudah dibaca." },
+      { role: "user", content: "loh emng belum terhubung ya?" },
+    ]);
+    check(
+      "follow-up terhubung tetap membaca konteks Git sebelumnya",
+      followUpContext.includes("Repository untuk WBS 1.1"),
+    );
+
+    const backend = tree.makeTask({
+      title: "Backend service",
+      repositoryPath: secondFixture,
+      order: 1,
+    });
+    const multiContext = await chat.gitContextFor(
+      [{ role: "user", content: "cek git kesana apakah task sudah sesuai terbaru?" }],
+      [parent, child, backend],
+    );
+    check(
+      "cek git tanpa WBS membaca repository terhubung yang jumlahnya wajar",
+      multiContext.includes("Repository terhubung ke WBS 1") &&
+        multiContext.includes("Repository terhubung ke WBS 2"),
+    );
     db.closeDb();
   } finally {
     rmSync(fixture, { recursive: true, force: true });
+    rmSync(secondFixture, { recursive: true, force: true });
     rmSync(dataDir, { recursive: true, force: true });
   }
 

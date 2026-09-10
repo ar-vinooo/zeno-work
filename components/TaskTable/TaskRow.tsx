@@ -103,6 +103,7 @@ function TaskRow({
   onBarDrag,
 }: Props) {
   const patchTask = useStore((s) => s.patchTask);
+  const setRepositoryPath = useStore((s) => s.setRepositoryPath);
   const toggleCollapse = useStore((s) => s.toggleCollapse);
   const addChildOf = useStore((s) => s.addChildOf);
   const addSiblingAfter = useStore((s) => s.addSiblingAfter);
@@ -135,7 +136,7 @@ function TaskRow({
     try {
       const selected = await zeno().repository.choose();
       if (selected) {
-        patchTask(task.id, { repositoryPath: selected });
+        await setRepositoryPath(task.id, selected);
         setRepoOpen(true);
         setRepoSummary(null);
         await loadRepositoryStatus(selected);
@@ -346,7 +347,7 @@ function TaskRow({
                     size="sm"
                     className="h-7 gap-1 text-[11px] text-[var(--color-blocked)]"
                     onClick={() => {
-                      patchTask(task.id, { repositoryPath: "" });
+                      void setRepositoryPath(task.id, "");
                       setRepoOpen(false);
                       setRepoSummary(null);
                     }}

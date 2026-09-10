@@ -116,6 +116,7 @@ ${lines.join("\n")}`;
 }
 
 const GIT_INTENT = /\b(git|repo|repository|commit|commitan|branch|kode)\b/i;
+const GIT_FOLLOWUP = /\b(terhubung|terkirim|connected|connect|kait|dikaitkan|sana|kesana|situ|itu|tersebut)\b/i;
 
 /**
  * Temukan repo dari nomor WBS dalam pesan terakhir. Tautan langsung menang;
@@ -127,7 +128,9 @@ export async function gitContextFor(
 ): Promise<string> {
   const latest = [...messages].reverse().find((message) => message.role === "user")
     ?.content ?? "";
-  if (!GIT_INTENT.test(latest)) return "";
+  const recent = messages.slice(-6).map((message) => message.content).join("\n");
+  if (!GIT_INTENT.test(latest) && !(GIT_FOLLOWUP.test(latest) && GIT_INTENT.test(recent)))
+    return "";
 
   const outline = buildOutline(tasks);
   const byWbs = new Map(outline.all.map((node) => [node.wbs, node]));
@@ -135,13 +138,16 @@ export async function gitContextFor(
   const saveScanIfPersisted = (taskId: string, scan: Parameters<typeof saveRepositoryScan>[0]) => {
     if (savedIds.has(taskId)) saveRepositoryScan(scan);
   };
-  const mentioned = [
-    ...new Set(
-      [...latest.matchAll(/\b\d+(?:\.\d+){0,2}\b/g)]
-        .map((match) => match[0])
-        .filter((wbs) => byWbs.has(wbs)),
-    ),
-  ];
+  const extractWbs = (text: string) =>
+    [
+      ...new Set(
+        [...text.matchAll(/\b\d+(?:\.\d+){0,2}\b/g)]
+          .map((match) => match[0])
+          .filter((wbs) => byWbs.has(wbs)),
+      ),
+    ];
+  let mentioned = extractWbs(latest);
+  if (mentioned.length === 0 && GIT_FOLLOWUP.test(latest)) mentioned = extractWbs(recent);
 
   const inherited = (wbs: string) => {
     let node = byWbs.get(wbs);
@@ -162,14 +168,55 @@ export async function gitContextFor(
       path: node.task.repositoryPath.trim(),
     }));
 
+  const titleTokens = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/\bfe\b/g, "frontend")
+      .replace(/\bbe\b/g, "backend")
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length >= 3);
   if (mentioned.length === 0) {
-    const paths = [...new Set(directBindings.map((binding) => binding.path))];
+    const tokens = new Set(titleTokens(latest));
+    if (tokens.size) {
+      const byTitle = directBindings
+        .filter((binding) =>
+          titleTokens(binding.title).some((token) => tokens.has(token)),
+        )
+        .map((binding) => binding.wbs);
+      mentioned = [...new Set(byTitle)];
+    }
+  }
+
+  if (mentioned.length === 0) {
+    const byPath = new Map<string, typeof directBindings>();
+    for (const binding of directBindings)
+      byPath.set(binding.path, [...(byPath.get(binding.path) ?? []), binding]);
+    const paths = [...byPath.keys()];
     if (paths.length === 0)
       return "KONTEKS GIT: belum ada task yang ditautkan ke repository. Minta pengguna menautkannya lewat ikon Git pada baris task.";
-    if (paths.length > 1)
-      return `KONTEKS GIT: ada beberapa repository. Minta pengguna menyebut nomor WBS yang ingin diperiksa.\n${directBindings
+    if (paths.length > 3)
+      return `KONTEKS GIT: ada ${paths.length} repository terhubung. Minta pengguna menyebut nomor WBS yang ingin diperiksa.\n${directBindings
         .map((binding) => `${binding.wbs}\t${binding.title}\t${binding.path}`)
         .join("\n")}`;
+    if (paths.length > 1) {
+      const contexts = await Promise.all(
+        paths.map(async (path) => {
+          const bindings = byPath.get(path)!;
+          const binding = bindings[0];
+          const previous = getRepositoryScan(binding.id);
+          const inspection = await inspectRepository(path, previous);
+          saveScanIfPersisted(binding.id, {
+            taskId: binding.id,
+            ...inspection.snapshot,
+            checkedAt: new Date().toISOString(),
+          });
+          return `Repository terhubung ke WBS ${bindings
+            .map((item) => `${item.wbs} (${item.title})`)
+            .join(", ")}:\n\n${inspection.context}`;
+        }),
+      );
+      return contexts.join("\n\n---\n\n");
+    }
     const binding = directBindings.find((item) => item.path === paths[0])!;
     const previous = getRepositoryScan(binding.id);
     const inspection = await inspectRepository(binding.path, previous);

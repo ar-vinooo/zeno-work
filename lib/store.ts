@@ -195,6 +195,8 @@ interface Store {
   /** Buang perubahan yang belum disimpan, kembali ke kondisi di database. */
   discard: () => void;
   patchTask: (id: string, patch: Omit<Patch, "id">) => void;
+  /** Tautan Git sengaja langsung disimpan agar asisten bisa membacanya saat itu juga. */
+  setRepositoryPath: (id: string, repositoryPath: string) => Promise<void>;
   addSiblingAfter: (id: string | null) => string;
   addChildOf: (id: string) => string;
   removeSelected: (mode: "cascade" | "promote") => void;
@@ -226,6 +228,8 @@ interface Store {
 const HISTORY_LIMIT = 50;
 
 export const useStore = create<Store>((set, get) => {
+  let repositoryPathQueue = Promise.resolve();
+
   /** Satu perubahan = satu langkah undo = satu batch sinkronisasi. */
   const commit = (next: Task[]) => {
     const prev = get().tasks;
@@ -349,6 +353,45 @@ export const useStore = create<Store>((set, get) => {
       const current = indexById(tasks).get(id);
       if (!current) return;
       commit(applyPatchList(tasks, [applyRules(current, { id, ...patch })]));
+    },
+
+    setRepositoryPath: async (id, repositoryPath) => {
+      const path = repositoryPath.trim();
+      const tasks = get().tasks;
+      const current = indexById(tasks).get(id);
+      if (!current) return;
+
+      commit(applyPatchList(tasks, [{ id, repositoryPath: path }]));
+
+      const persisted = indexById(get().baseline).get(id);
+      if (!persisted || persisted.repositoryPath === path) return;
+
+      repositoryPathQueue = repositoryPathQueue
+        .catch(() => {
+          // Error sebelumnya sudah masuk state; antrean berikutnya tetap jalan.
+        })
+        .then(async () => {
+          set((s) => ({ saving: s.saving + 1 }));
+          try {
+            await zeno().tasks.sync({ patches: [{ id, repositoryPath: path }] });
+            set((s) => {
+              const baseline = applyPatchList(s.baseline, [
+                { id, repositoryPath: path },
+              ]);
+              return {
+                baseline,
+                pending: countDiff(diffTasks(baseline, s.tasks)),
+                error: null,
+              };
+            });
+          } catch (err) {
+            set({ error: (err as Error).message });
+          } finally {
+            set((s) => ({ saving: Math.max(0, s.saving - 1) }));
+          }
+        });
+
+      await repositoryPathQueue;
     },
 
     addSiblingAfter: (id) => {
