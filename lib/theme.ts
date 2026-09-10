@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 export type ThemeMode = "system" | "light" | "dark";
+export const THEME_SEQUENCE: ThemeMode[] = ["system", "light", "dark"];
 
 const KEY = "zenowork.theme";
 const QUERY = "(prefers-color-scheme: dark)";
@@ -59,4 +60,9 @@ export function useThemeMode() {
   };
 
   return { mode, setMode };
+}
+
+export function nextThemeMode(mode: ThemeMode): ThemeMode {
+  const index = THEME_SEQUENCE.indexOf(mode);
+  return THEME_SEQUENCE[(index + 1) % THEME_SEQUENCE.length] ?? "system";
 }

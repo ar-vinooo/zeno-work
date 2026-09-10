@@ -9,12 +9,15 @@ import {
   Crosshair,
   Download,
   Filter,
+  Monitor,
+  Moon,
   Redo2,
   RotateCcw,
   Save,
   Search,
   Settings,
   Sparkles,
+  Sun,
   TableProperties,
   Undo2,
   Upload,
@@ -56,6 +59,7 @@ import { useStore } from "@/lib/store";
 import { buildOutline } from "@/lib/rollup";
 import { durationOf, todayISO } from "@/lib/dates";
 import { useShortcutText } from "@/lib/shortcuts";
+import { nextThemeMode, useThemeMode } from "@/lib/theme";
 import {
   RANGE_LABEL,
   PRIORITY_LABEL,
@@ -135,6 +139,7 @@ export default function Toolbar({
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const shortcut = useShortcutText();
+  const theme = useThemeMode();
   const saveShortcut = shortcut(["mod", "S"]);
   const undoShortcut = shortcut(["mod", "Z"]);
   const redoShortcut = shortcut(["shift", "mod", "Z"]);
@@ -218,6 +223,15 @@ export default function Toolbar({
       );
     }
   };
+
+  const ThemeIcon =
+    theme.mode === "dark" ? Moon : theme.mode === "light" ? Sun : Monitor;
+  const themeLabel =
+    theme.mode === "dark"
+      ? "Tema: Dark (klik untuk System)"
+      : theme.mode === "light"
+        ? "Tema: Light (klik untuk Dark)"
+        : "Tema: System (klik untuk Light)";
 
   const iconButton = (
     label: string,
@@ -489,6 +503,9 @@ export default function Toolbar({
             "Asisten AI",
             <Sparkles className="size-3.5" />,
             useStore.getState().toggleChat,
+          )}
+          {iconButton(themeLabel, <ThemeIcon className="size-3.5" />, () =>
+            theme.setMode(nextThemeMode(theme.mode)),
           )}
           {iconButton("Setelan", <Settings className="size-3.5" />, () =>
             useStore.getState().setSettingsOpen(true),

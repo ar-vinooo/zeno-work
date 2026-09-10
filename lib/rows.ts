@@ -72,9 +72,9 @@ export function computeRows(
   const today = todayISO();
   const outline = buildOutline(tasks);
   const focusRoot = focusRootId ? outline.byId.get(focusRootId) : undefined;
-  // Fokus cabang sengaja mengalahkan filter biasa: pemilik harus bisa melihat
-  // satu WBS lengkap sampai daun, termasuk yang sudah Done.
-  const filtering = filterActive(filters) || !!focusRoot;
+  const filterIsActive = filterActive(filters);
+  // Fokus membatasi scope tampilan, filter tetap boleh menyaring di dalamnya.
+  const filtering = filterIsActive || !!focusRoot;
 
   const matched = new Set<string>();
   const visible = new Set<string>();
@@ -84,7 +84,19 @@ export function computeRows(
       visible.add(node.task.id);
       for (const child of node.children) markBranch(child);
     };
-    markBranch(focusRoot);
+    if (filterIsActive) {
+      const mark = (node: TaskNode, ancestors: string[]) => {
+        if (matches(node, filters, today)) {
+          matched.add(node.task.id);
+          visible.add(node.task.id);
+          for (const a of ancestors) visible.add(a);
+        }
+        for (const child of node.children) mark(child, [...ancestors, node.task.id]);
+      };
+      mark(focusRoot, []);
+    } else {
+      markBranch(focusRoot);
+    }
   } else if (filtering) {
     for (const node of outline.all)
       if (matches(node, filters, today)) matched.add(node.task.id);
@@ -109,7 +121,7 @@ export function computeRows(
       if (filtering && !visible.has(id)) continue;
       rows.push({
         ...node,
-        contextOnly: !focusRoot && filtering && !matched.has(id),
+        contextOnly: filtering && !matched.has(id),
       });
       if (filtering || !node.task.collapsed) walk(node.children);
     }
@@ -129,7 +141,8 @@ export function computeRows(
   const weekStart = weekStartISO(today);
   const weekEnd = shiftISO(weekStart, 6);
 
-  for (const node of outline.all) {
+  const statsNodes = focusRoot ? matchedNodes : outline.all;
+  for (const node of statsNodes) {
     // Hitung daun saja supaya induk tidak dihitung dobel dengan anaknya.
     if (node.children.length > 0) continue;
     byStatus[node.eff.status] += 1;
@@ -147,8 +160,8 @@ export function computeRows(
     outline,
     filtering,
     stats: {
-      total: outline.all.length,
-      leaves: outline.all.filter((n) => n.children.length === 0).length,
+      total: statsNodes.length,
+      leaves: statsNodes.filter((n) => n.children.length === 0).length,
       byStatus,
       overdue,
       avgProgress: activeCount ? Math.round(activeSum / activeCount) : 0,
