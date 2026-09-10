@@ -120,7 +120,11 @@ export default function ChatPanel() {
     setTurns((prev) => [...prev, { role: "user", text }]);
 
     try {
-      const data = await zeno().chat.send(history, useStore.getState().tasks);
+      const state = useStore.getState();
+      const data = await zeno().chat.send(history, {
+        tasks: state.tasks,
+        pending: state.pending,
+      });
 
       const applied = data.operations?.length
         ? applyAiOperations(data.operations)

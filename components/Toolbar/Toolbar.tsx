@@ -242,7 +242,7 @@ export default function Toolbar({
   );
 
   return (
-    <header className="shrink-0 border-b border-[var(--color-line)] bg-white">
+    <header className="shrink-0 border-b border-[var(--color-line)] bg-[var(--color-surface)]">
       <div className="flex h-11 items-center gap-2 px-3">
 
         <Tabs

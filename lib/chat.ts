@@ -42,6 +42,11 @@ export interface ChatReply {
   costUsd?: number;
 }
 
+export interface ChatSnapshot {
+  tasks: Task[];
+  pending?: number;
+}
+
 /**
  * Parameter penalaran berbeda per keluarga model, dan salah pasang bukan
  * sekadar kurang optimal — Haiku 4.5 menolak `output_config.effort` dengan
@@ -65,13 +70,60 @@ function reasoningParams(model: string, effort: string) {
   };
 }
 
-function chatTasks(snapshot?: unknown): Task[] {
-  if (!Array.isArray(snapshot)) return listTasks();
-  return snapshot.filter(isTask);
+function chatSnapshot(snapshot?: unknown): ChatSnapshot {
+  if (Array.isArray(snapshot)) return { tasks: snapshot.filter(isTask) };
+  if (snapshot && typeof snapshot === "object") {
+    const raw = snapshot as { tasks?: unknown; pending?: unknown };
+    return {
+      tasks: Array.isArray(raw.tasks) ? raw.tasks.filter(isTask) : listTasks(),
+      pending:
+        typeof raw.pending === "number" && Number.isFinite(raw.pending)
+          ? Math.max(0, Math.round(raw.pending))
+          : undefined,
+    };
+  }
+  return { tasks: listTasks() };
+}
+
+const SAVE_COMPARE_FIELDS: (keyof Task)[] = [
+  "parentId",
+  "order",
+  "title",
+  "progress",
+  "start",
+  "end",
+  "status",
+  "priority",
+  "rollup",
+  "notes",
+  "repositoryPath",
+];
+
+function matchesDatabase(tasks: Task[]): boolean {
+  const persisted = listTasks();
+  if (persisted.length !== tasks.length) return false;
+  const current = new Map(tasks.map((task) => [task.id, task]));
+  for (const saved of persisted) {
+    const task = current.get(saved.id);
+    if (!task) return false;
+    if (SAVE_COMPARE_FIELDS.some((field) => task[field] !== saved[field]))
+      return false;
+  }
+  return true;
+}
+
+function saveStateText(tasks: Task[], pending?: number): string {
+  if (pending === undefined)
+    return "STATUS SIMPAN: metadata pending tidak tersedia. Jangan mengklaim sudah tersimpan tanpa membaca data aktual.";
+  if (pending > 0)
+    return `STATUS SIMPAN: ada ${pending} perubahan tertunda di editor. Belum tersimpan ke database sampai pengguna menekan Simpan.`;
+  return matchesDatabase(tasks)
+    ? "STATUS SIMPAN: tidak ada perubahan tertunda, dan snapshot editor cocok dengan database. Jika pengguna bertanya apakah sudah tersimpan, jawab sudah tersimpan."
+    : "STATUS SIMPAN: tidak ada perubahan tertunda di editor, tetapi snapshot yang dikirim tidak cocok dengan database. Minta refresh sebelum mengklaim tersimpan.";
 }
 
 /** Peta awal yang ringan. Detailnya dibuka model lewat tree_search/find_tasks. */
-function initialTreeText(tasks: Task[]): string {
+function initialTreeText(tasks: Task[], saveState: string): string {
   const outline = buildOutline(tasks);
   const sections = outline.roots
     .map((n) => {
@@ -79,7 +131,9 @@ function initialTreeText(tasks: Task[]): string {
       return `${n.wbs}. ${n.task.title} — ${subs ? `${subs} sub-bagian` : "tanpa sub-task"}, ${n.eff.progress}%, ${n.eff.start}..${n.eff.end}`;
     })
     .join("\n");
-  return `PETA AWAL WBS dari live editor.
+  return `${saveState}
+
+PETA AWAL WBS dari live editor.
 Jumlah baris: ${outline.all.length} (${outline.roots.length} bagian tingkat 1).
 Untuk detail, pakai tree_search dulu, lalu find_tasks atau get_subtree pada WBS yang relevan.
 
@@ -88,7 +142,7 @@ ${sections || "(kosong)"}`;
 }
 
 /** Daftar lengkap untuk mode CLI, karena CLI belum punya tool-call interaktif. */
-function fullOutlineText(tasks: Task[]): string {
+function fullOutlineText(tasks: Task[], saveState: string): string {
   const outline = buildOutline(tasks);
   const today = todayISO();
   const sections = outline.roots
@@ -105,7 +159,9 @@ function fullOutlineText(tasks: Task[]): string {
     ].filter(Boolean);
     return `${n.wbs}\t${n.task.title}\t${n.eff.progress}%\t${n.eff.start}..${n.eff.end}\t${durationOf(n.eff.start, n.eff.end)}h\t${STATUS_LABEL[n.eff.status]}${flags.length ? `\t[${flags.join(",")}]` : ""}`;
   });
-  return `Hari ini: ${today}
+  return `${saveState}
+
+Hari ini: ${today}
 Jumlah baris: ${outline.all.length} (${outline.roots.length} bagian di tingkat 1)
 
 Bagian tingkat 1:
@@ -159,12 +215,27 @@ export async function gitContextFor(
     return null;
   };
 
+  const lineageTitle = (id: string): string => {
+    const node = outline.byId.get(id);
+    if (!node) return "";
+    const titles = [node.task.title];
+    let parentId = node.task.parentId;
+    while (parentId) {
+      const parent = outline.byId.get(parentId);
+      if (!parent) break;
+      titles.push(parent.task.title);
+      parentId = parent.task.parentId;
+    }
+    return titles.join(" ");
+  };
+
   const directBindings = outline.all
     .filter((node) => node.task.repositoryPath.trim())
     .map((node) => ({
       id: node.task.id,
       wbs: node.wbs,
       title: node.task.title,
+      searchText: lineageTitle(node.task.id),
       path: node.task.repositoryPath.trim(),
     }));
 
@@ -180,7 +251,7 @@ export async function gitContextFor(
     if (tokens.size) {
       const byTitle = directBindings
         .filter((binding) =>
-          titleTokens(binding.title).some((token) => tokens.has(token)),
+          titleTokens(binding.searchText).some((token) => tokens.has(token)),
         )
         .map((binding) => binding.wbs);
       mentioned = [...new Set(byTitle)];
@@ -236,18 +307,41 @@ export async function gitContextFor(
   >();
   for (const wbs of mentioned) {
     const found = inherited(wbs);
-    if (!found) {
+    const descendantBindings = found
+      ? []
+      : directBindings.filter(
+          (binding) => binding.wbs === wbs || binding.wbs.startsWith(`${wbs}.`),
+        );
+    if (!found && descendantBindings.length === 0) {
       missing.push(wbs);
       continue;
     }
-    const current = selected.get(found.path);
-    if (current) current.requestedWbs.push(wbs);
-    else
-      selected.set(found.path, {
-        ownerId: byWbs.get(found.ownerWbs)!.task.id,
-        ownerWbs: found.ownerWbs,
+    const bindings = found
+      ? [
+          {
+            path: found.path,
+            ownerWbs: found.ownerWbs,
+            ownerId: byWbs.get(found.ownerWbs)!.task.id,
+          },
+        ]
+      : descendantBindings.map((binding) => ({
+          path: binding.path,
+          ownerWbs: binding.wbs,
+          ownerId: binding.id,
+        }));
+
+    for (const binding of bindings) {
+      const current = selected.get(binding.path);
+      if (current) {
+        if (!current.requestedWbs.includes(wbs)) current.requestedWbs.push(wbs);
+        continue;
+      }
+      selected.set(binding.path, {
+        ownerId: binding.ownerId,
+        ownerWbs: binding.ownerWbs,
         requestedWbs: [wbs],
       });
+    }
   }
 
   const contexts = await Promise.all(
@@ -279,6 +373,7 @@ async function viaCli(
   provider: "claude-cli" | "codex-cli",
   repoContext: string,
   tasks: Task[],
+  saveState: string,
 ): Promise<ChatReply> {
   const settings = readSettings();
 
@@ -287,7 +382,7 @@ async function viaCli(
   const transcript = messages
     .map((m) => `${m.role === "user" ? "Pengguna" : "Kamu"}: ${m.content}`)
     .join("\n\n");
-  const prompt = `${dateContext()}\n\n${fullOutlineText(tasks)}${repoContext ? `\n\n${repoContext}` : ""}\n\n---\n\n${transcript}`;
+  const prompt = `${dateContext()}\n\n${fullOutlineText(tasks, saveState)}${repoContext ? `\n\n${repoContext}` : ""}\n\n---\n\n${transcript}`;
 
   const system = `${SYSTEM_INSTRUCTIONS}\n${CLI_OUTPUT_CONTRACT}`;
 
@@ -327,10 +422,12 @@ export async function runChat(messages: ChatMessage[], taskSnapshot?: unknown): 
   if (messages.length === 0) throw new Error("Tidak ada pesan");
 
   const settings = readSettings();
-  const tasks = chatTasks(taskSnapshot);
+  const snapshot = chatSnapshot(taskSnapshot);
+  const tasks = snapshot.tasks;
+  const saveState = saveStateText(tasks, snapshot.pending);
   const repoContext = await gitContextFor(messages, tasks);
   if (settings.aiProvider === "claude-cli" || settings.aiProvider === "codex-cli")
-    return viaCli(messages, settings.aiProvider, repoContext, tasks);
+    return viaCli(messages, settings.aiProvider, repoContext, tasks, saveState);
 
   if (!settings.anthropicApiKey)
     throw new Error(
@@ -353,7 +450,7 @@ export async function runChat(messages: ChatMessage[], taskSnapshot?: unknown): 
     { type: "text", text: SYSTEM_INSTRUCTIONS },
     {
       type: "text",
-      text: initialTreeText(tasks),
+      text: initialTreeText(tasks, saveState),
       cache_control: { type: "ephemeral" },
     },
     ...(repoContext

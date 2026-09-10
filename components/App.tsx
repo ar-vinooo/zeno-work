@@ -23,6 +23,7 @@ import { computeRows } from "@/lib/rows";
 import { makeScale, xForDate } from "@/lib/schedule";
 import { useShortcutText } from "@/lib/shortcuts";
 import { useStore } from "@/lib/store";
+import { useThemeMode } from "@/lib/theme";
 import { childrenOf, subtreeIds, topMost } from "@/lib/tree";
 
 const PAD = { day: 10, week: 21, month: 60 } as const;
@@ -46,6 +47,7 @@ export default function App() {
   const [calendarTodayToken, setCalendarTodayToken] = useState(0);
   const shortcut = useShortcutText();
   const undoShortcut = shortcut(["mod", "Z"]);
+  useThemeMode();
 
   // Muatan pertama dari proses utama. Sampai ini selesai tabelnya belum
   // digambar sama sekali — lebih baik daripada memperlihatkan tabel kosong

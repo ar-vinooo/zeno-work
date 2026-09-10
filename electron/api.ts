@@ -1,5 +1,5 @@
 import type { PublicSettings, Settings } from "../lib/settings";
-import type { ChatMessage, ChatReply } from "../lib/chat";
+import type { ChatMessage, ChatReply, ChatSnapshot } from "../lib/chat";
 import type { SyncDiff } from "../lib/sync";
 import type { Task } from "../lib/types";
 import type { RepositorySummary } from "../lib/repository";
@@ -72,6 +72,6 @@ export interface ZenoApi {
     text(fileName: string, content: string): Promise<SaveResult>;
   };
   chat: {
-    send(messages: ChatMessage[], tasks: Task[]): Promise<ChatReply>;
+    send(messages: ChatMessage[], snapshot: ChatSnapshot): Promise<ChatReply>;
   };
 }
