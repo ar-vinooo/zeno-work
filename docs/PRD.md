@@ -543,7 +543,7 @@ tampilkan task daun" agar tidak dobel dengan induknya.
 | State | Zustand (atau React state + reducer) | Ringan, cukup untuk single-user |
 | Drag & drop | Pointer Events sendiri | Drag baris dan drag bar butuh proyeksi tingkat dan snapping harian yang spesifik; library generik tetap harus dilawan |
 | Tanggal | date-fns | Ringan, tree-shakeable |
-| Penyimpanan | SQLite lokal via better-sqlite3 | Data tahan lama, satu file, dan sinkron (tanpa async) sehingga transaksi mudah dijamin |
+| Penyimpanan | SQLite lokal via `node:sqlite` | Data tahan lama, satu file, sinkron, dan kompatibel di Node.js maupun Electron tanpa binary ABI tambahan |
 | Timeline | Custom (div + CSS grid) | Library Gantt umumnya berat & sulit disesuaikan |
 
 **Alternatif tanpa server:** kalau ingin app benar-benar statis, ganti lapis

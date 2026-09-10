@@ -46,6 +46,8 @@ function matches(node: TaskNode, f: Filters, today: string): boolean {
 
 export interface RowsResult {
   rows: Row[];
+  /** Node yang benar-benar cocok dengan filter, tanpa leluhur konteks. */
+  matchedNodes: TaskNode[];
   outline: Outline;
   stats: Stats;
   filtering: boolean;
@@ -81,6 +83,10 @@ export function computeRows(
     };
     for (const root of outline.roots) mark(root, []);
   }
+
+  const matchedNodes = filtering
+    ? outline.all.filter((node) => matched.has(node.task.id))
+    : outline.all;
 
   const rows: Row[] = [];
   const walk = (nodes: TaskNode[]) => {
@@ -120,6 +126,7 @@ export function computeRows(
 
   return {
     rows,
+    matchedNodes,
     outline,
     filtering,
     stats: {

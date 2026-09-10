@@ -106,6 +106,11 @@ check(
   filtered.rows.map((r) => `${r.wbs}${r.contextOnly ? "*" : ""}`),
   ["2*", "2.2"],
 );
+check(
+  "hasil kalender hanya berisi task yang cocok, bukan leluhur konteks",
+  filtered.matchedNodes.map((n) => n.wbs),
+  ["2.2"],
+);
 
 // Collapse menyembunyikan keturunan tapi induk tetap ada
 const collapsed = applyPatchList(tasks, [{ id: A.id, collapsed: true }]);

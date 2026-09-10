@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import {
+  CalendarDays,
   ChevronsDownUp,
   ChevronsUpDown,
   Columns3,
@@ -13,6 +14,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  TableProperties,
   Undo2,
   Upload,
 } from "lucide-react";
@@ -64,6 +66,8 @@ const ZOOMS: { value: ZoomUnit; label: string }[] = [
   { value: "month", label: "Bulan" },
 ];
 
+export type WorkspaceView = "table" | "calendar";
+
 function download(name: string, content: string, type: string) {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = document.createElement("a");
@@ -76,9 +80,13 @@ function download(name: string, content: string, type: string) {
 export default function Toolbar({
   stats,
   onJumpToday,
+  view,
+  onViewChange,
 }: {
   stats: Stats;
   onJumpToday: () => void;
+  view: WorkspaceView;
+  onViewChange: (view: WorkspaceView) => void;
 }) {
   const tasks = useStore((s) => s.tasks);
   const filters = useStore((s) => s.filters);
@@ -133,14 +141,33 @@ export default function Toolbar({
   };
 
   const importJson = async (file: File) => {
-    const text = await file.text();
-    const parsed = JSON.parse(text) as { tasks?: unknown };
-    await fetch("/api/backup", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tasks: parsed.tasks ?? parsed, mode: "replace" }),
-    });
-    await refresh();
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as { tasks?: unknown };
+      if (
+        !window.confirm(
+          "Import akan mengganti seluruh task saat ini. Lanjutkan?",
+        )
+      )
+        return;
+      const response = await fetch("/api/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tasks: parsed.tasks ?? parsed, mode: "replace" }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(body?.error ?? "File tidak dapat diimpor.");
+      }
+      await refresh();
+      window.alert("Import selesai. Semua task berhasil dipulihkan.");
+    } catch (error) {
+      window.alert(
+        error instanceof Error ? error.message : "File JSON tidak valid.",
+      );
+    }
   };
 
   const iconButton = (
@@ -170,7 +197,23 @@ export default function Toolbar({
       <div className="flex h-11 items-center gap-2 px-3">
         <span className="text-[13px] font-semibold tracking-tight">ZenoWork</span>
 
-        <div className="relative ml-2 w-56">
+        <Tabs
+          value={view}
+          onValueChange={(value) => onViewChange(value as WorkspaceView)}
+        >
+          <TabsList className="h-7 p-0.5">
+            <TabsTrigger value="table" className="h-6 gap-1 px-2 text-[11px]">
+              <TableProperties className="size-3" />
+              Tabel
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="h-6 gap-1 px-2 text-[11px]">
+              <CalendarDays className="size-3" />
+              Kalender
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        <div className="relative w-56">
           <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-[var(--color-faint)]" />
           <input
             id="zeno-search"
@@ -260,7 +303,7 @@ export default function Toolbar({
 
         {/* Mode urutan (§5.3): sorting tidak pernah menulis ulang urutan manual
             kecuali diminta lewat tombol ini. */}
-        {sort.column === "manual" ? (
+        {view === "table" && (sort.column === "manual" ? (
           <span className="rounded border border-[var(--color-line)] px-1.5 py-0.5 text-[11px] text-[var(--color-ink-soft)]">
             Urutan manual
           </span>
@@ -286,7 +329,7 @@ export default function Toolbar({
               Batal
             </Button>
           </div>
-        )}
+        ))}
 
         <div className="ml-auto flex items-center gap-1.5">
           {error && (
@@ -313,20 +356,24 @@ export default function Toolbar({
 
           {iconButton("Undo (⌘Z)", <Undo2 className="size-3.5" />, undo, !canUndo)}
           {iconButton("Redo (⇧⌘Z)", <Redo2 className="size-3.5" />, redo, !canRedo)}
-          {iconButton(
-            "Tutup semua (⇧⌘[)",
-            <ChevronsDownUp className="size-3.5" />,
-            () => setAllCollapsed(true),
-          )}
-          {iconButton(
-            "Buka semua (⇧⌘])",
-            <ChevronsUpDown className="size-3.5" />,
-            () => setAllCollapsed(false),
-          )}
-          {iconButton(
-            showDuration ? "Sembunyikan kolom durasi" : "Tampilkan kolom durasi",
-            <Columns3 className="size-3.5" />,
-            toggleDurationColumn,
+          {view === "table" && (
+            <>
+              {iconButton(
+                "Tutup semua (⇧⌘[)",
+                <ChevronsDownUp className="size-3.5" />,
+                () => setAllCollapsed(true),
+              )}
+              {iconButton(
+                "Buka semua (⇧⌘])",
+                <ChevronsUpDown className="size-3.5" />,
+                () => setAllCollapsed(false),
+              )}
+              {iconButton(
+                showDuration ? "Sembunyikan kolom durasi" : "Tampilkan kolom durasi",
+                <Columns3 className="size-3.5" />,
+                toggleDurationColumn,
+              )}
+            </>
           )}
           {iconButton("Lompat ke hari ini (T)", <Crosshair className="size-3.5" />, onJumpToday)}
           {iconButton(
@@ -338,19 +385,27 @@ export default function Toolbar({
             useStore.getState().setSettingsOpen(true),
           )}
 
-          <Tabs value={zoom} onValueChange={(v) => setZoom(v as ZoomUnit)}>
-            <TabsList className="h-7 p-0.5">
-              {ZOOMS.map((z) => (
-                <TabsTrigger key={z.value} value={z.value} className="h-6 px-2 text-[11px]">
-                  {z.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          {view === "table" && (
+            <Tabs value={zoom} onValueChange={(v) => setZoom(v as ZoomUnit)}>
+              <TabsList className="h-7 p-0.5">
+                {ZOOMS.map((z) => (
+                  <TabsTrigger key={z.value} value={z.value} className="h-6 px-2 text-[11px]">
+                    {z.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-7">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label="Import atau export data"
+                title="Import atau export data"
+              >
                 <Download className="size-3.5" />
               </Button>
             </DropdownMenuTrigger>
@@ -360,7 +415,7 @@ export default function Toolbar({
                   window.location.href = "/api/backup";
                 }}
               >
-                Export JSON (lengkap)
+                Export JSON (backup data)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={exportCsv}>Export CSV</DropdownMenuItem>
               <DropdownMenuItem
@@ -376,7 +431,7 @@ export default function Toolbar({
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => fileRef.current?.click()}>
                 <Upload className="size-3.5" />
-                Import JSON (ganti semua)
+                Import JSON (pulihkan data)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

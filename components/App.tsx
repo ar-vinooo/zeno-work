@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import CalendarView from "./Calendar/CalendarView";
 import Grid from "./Grid";
-import Toolbar from "./Toolbar/Toolbar";
+import Toolbar, { type WorkspaceView } from "./Toolbar/Toolbar";
 import ChatPanel from "./Chat/ChatPanel";
 import SettingsDialog from "./Settings/SettingsDialog";
 import {
@@ -42,12 +43,14 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
   const centered = useRef(false);
   const lastCentered = useRef<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [view, setView] = useState<WorkspaceView>("table");
+  const [calendarTodayToken, setCalendarTodayToken] = useState(0);
 
   useEffect(() => {
     hydrate(initialTasks);
   }, [hydrate, initialTasks]);
 
-  const { rows, stats, outline } = useMemo(
+  const { rows, matchedNodes, stats, outline } = useMemo(
     () => computeRows(tasks, sort, filters),
     [tasks, sort, filters],
   );
@@ -90,17 +93,21 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
     [leftPaneWidth, scale],
   );
 
-  const jumpToday = useCallback(
-    () => centerOn(todayISO(), true),
-    [centerOn],
-  );
+  const jumpToday = useCallback(() => {
+    if (view === "calendar") setCalendarTodayToken((token) => token + 1);
+    else centerOn(todayISO(), true);
+  }, [centerOn, view]);
 
   // Sekali saat pertama dibuka: posisikan timeline di sekitar hari ini.
   useEffect(() => {
+    if (view !== "table") {
+      centered.current = false;
+      return;
+    }
     if (centered.current || !scrollRef.current || tasks.length === 0) return;
     centered.current = true;
     centerOn(todayISO(), false);
-  }, [centerOn, tasks.length]);
+  }, [centerOn, tasks.length, view]);
 
   /**
    * Memilih baris menggeser timeline ke tanggal mulainya. Rentang datamu
@@ -109,6 +116,7 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
    * menggeser tiap klik justru bikin pusing.
    */
   useEffect(() => {
+    if (view !== "table") return;
     const id = selection[0];
     if (!id || id === lastCentered.current) return;
     lastCentered.current = id;
@@ -123,7 +131,7 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
     const margin = visible * 0.2;
     if (screenX > margin && screenX < visible - margin) return;
     centerOn(node.eff.start, true);
-  }, [selection, outline, scale, centerOn, leftPaneWidth]);
+  }, [selection, outline, scale, centerOn, leftPaneWidth, view]);
 
   // Ringkasan baris yang akan dihapus, dipakai di teks dialog.
   const deleteTarget = useMemo(() => {
@@ -204,27 +212,35 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
         document.getElementById("zeno-search")?.focus();
         return;
       }
-      if (mod && (e.key === "]" || e.key === "[")) {
+      if (view === "table" && mod && (e.key === "]" || e.key === "[")) {
         e.preventDefault();
         if (e.shiftKey) return s.setAllCollapsed(e.key === "[");
         return e.key === "]" ? s.indentSelected() : s.outdentSelected();
       }
-      if (mod && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+      if (
+        view === "table" &&
+        mod &&
+        (e.key === "ArrowUp" || e.key === "ArrowDown")
+      ) {
         e.preventDefault();
         return s.nudgeVertical(e.key === "ArrowUp" ? -1 : 1);
       }
-      if (e.key === "Tab" && s.selection.length) {
+      if (view === "table" && e.key === "Tab" && s.selection.length) {
         e.preventDefault();
         return e.shiftKey ? s.outdentSelected() : s.indentSelected();
       }
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      if (view === "table" && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
         if (!rows.length) return;
         e.preventDefault();
         const next = rows[Math.max(0, Math.min(rows.length - 1, index + (e.key === "ArrowDown" ? 1 : -1)))];
         if (next) s.select(next.task.id);
         return;
       }
-      if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && selected) {
+      if (
+        view === "table" &&
+        (e.key === "ArrowLeft" || e.key === "ArrowRight") &&
+        selected
+      ) {
         const row = rows[index];
         if (!row || row.children.length === 0) return;
         const wantCollapsed = e.key === "ArrowLeft";
@@ -233,6 +249,7 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
       }
       if (e.key === "Enter" && selected) {
         e.preventDefault();
+        if (view === "calendar") setView("table");
         return s.setEditing({ id: selected, field: "title" });
       }
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -241,6 +258,7 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
       }
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
+        if (view === "calendar") setView("table");
         if (e.shiftKey && selected) return void s.addChildOf(selected);
         return void s.addSiblingAfter(selected ?? rows[rows.length - 1]?.task.id ?? null);
       }
@@ -252,7 +270,7 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [confirmDelete, runDelete, jumpToday, rows, store]);
+  }, [confirmDelete, runDelete, jumpToday, rows, store, view]);
 
   // Perubahan hanya di memori; menutup tab tanpa menyimpan berarti hilang.
   useEffect(() => {
@@ -267,15 +285,28 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
 
   return (
     <div className="flex h-full flex-col">
-      <Toolbar stats={stats} onJumpToday={jumpToday} />
+      <Toolbar
+        stats={stats}
+        onJumpToday={jumpToday}
+        view={view}
+        onViewChange={setView}
+      />
       <div className="flex min-h-0 flex-1">
-        <Grid
-        rows={rows}
-        scale={scale}
-        scrollRef={scrollRef}
-        onRequestDelete={requestDelete}
-          isEmpty={tasks.length === 0}
-        />
+        {view === "table" ? (
+          <Grid
+            rows={rows}
+            scale={scale}
+            scrollRef={scrollRef}
+            onRequestDelete={requestDelete}
+            isEmpty={tasks.length === 0}
+          />
+        ) : (
+          <CalendarView
+            nodes={matchedNodes}
+            todayToken={calendarTodayToken}
+            onOpenTable={() => setView("table")}
+          />
+        )}
         <ChatPanel />
       </div>
 

@@ -1,9 +1,13 @@
-import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
+import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import type { Patch, Task } from "./types";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+// Electron mengisi ZENO_DATA_DIR dengan folder userData milik sistem. Versi
+// web lokal tetap memakai ./data agar perilaku lama tidak berubah.
+const DATA_DIR = process.env.ZENO_DATA_DIR
+  ? path.resolve(process.env.ZENO_DATA_DIR)
+  : path.join(process.cwd(), "data");
 const DB_PATH = process.env.ZENO_DB ?? path.join(DATA_DIR, "zeno-work.db");
 
 type Row = Omit<Task, "collapsed" | "rollup"> & {
@@ -35,25 +39,41 @@ CREATE TABLE IF NOT EXISTS meta (
 );
 `;
 
-function open(): Database.Database {
+function open(): DatabaseSync {
   fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  const conn = new Database(DB_PATH);
-  conn.pragma("journal_mode = WAL");
+  const conn = new DatabaseSync(DB_PATH, {
+    timeout: 5_000,
+    enableForeignKeyConstraints: true,
+  });
+  conn.exec("PRAGMA journal_mode = WAL");
   // Saat build, Next.js menjalankan beberapa worker yang membuka file yang
   // sama; tanpa ini salah satunya langsung gagal dengan SQLITE_BUSY.
-  conn.pragma("busy_timeout = 5000");
-  conn.pragma("foreign_keys = ON");
+  conn.exec("PRAGMA busy_timeout = 5000");
+  conn.exec("PRAGMA foreign_keys = ON");
   conn.exec(SCHEMA);
   return conn;
 }
 
 // Dibuka saat pertama dipakai, bukan saat modul diimpor — impor terjadi juga
 // pada tahap pengumpulan data build, di mana DB belum tentu perlu disentuh.
-const globalForDb = globalThis as unknown as { zenoDb?: Database.Database };
+const globalForDb = globalThis as unknown as { zenoDb?: DatabaseSync };
 
-export function getDb(): Database.Database {
+export function getDb(): DatabaseSync {
   if (!globalForDb.zenoDb) globalForDb.zenoDb = open();
   return globalForDb.zenoDb;
+}
+
+/** `node:sqlite` sengaja dipakai agar web dan Electron tidak membutuhkan
+ * binary native dengan ABI yang berbeda. */
+function inTransaction(db: DatabaseSync, run: () => void): void {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    run();
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
 }
 
 const COLUMNS = [
@@ -90,19 +110,20 @@ export function listTasks(): Task[] {
 
 export function insertTasks(tasks: Task[]): void {
   const db = getDb();
+  inTransaction(db, () => insertTasksWith(db, tasks));
+}
+
+function insertTasksWith(db: DatabaseSync, tasks: Task[]): void {
   const stmt = db.prepare(
     `INSERT INTO tasks ("id", ${COLUMNS.map((c) => `"${c}"`).join(", ")})
      VALUES (@id, ${COLUMNS.map((c) => `@${c}`).join(", ")})`,
   );
-  const run = db.transaction((items: Task[]) => {
-    for (const t of items)
-      stmt.run({
-        ...t,
-        collapsed: t.collapsed ? 1 : 0,
-        rollup: t.rollup ? 1 : 0,
-      });
-  });
-  run(tasks);
+  for (const task of tasks)
+    stmt.run({
+      ...task,
+      collapsed: task.collapsed ? 1 : 0,
+      rollup: task.rollup ? 1 : 0,
+    });
 }
 
 /**
@@ -114,8 +135,8 @@ export function applyPatches(patches: Patch[]): void {
   if (patches.length === 0) return;
   const db = getDb();
   const now = new Date().toISOString();
-  const run = db.transaction((items: Patch[]) => {
-    for (const patch of items) {
+  inTransaction(db, () => {
+    for (const patch of patches) {
       // createdAt & updatedAt tidak pernah diambil dari klien: updatedAt
       // selalu ditulis server, dan duplikat kolom di SET harus dihindari.
       const fields = COLUMNS.filter(
@@ -123,7 +144,10 @@ export function applyPatches(patches: Patch[]): void {
       );
       if (fields.length === 0) continue;
       const assignments = fields.map((c) => `"${c}" = @${c}`).join(", ");
-      const params: Record<string, unknown> = { id: patch.id, updatedAt: now };
+      const params: Record<string, SQLInputValue> = {
+        id: patch.id,
+        updatedAt: now,
+      };
       for (const c of fields)
         params[c] = toSql((patch as Record<string, unknown>)[c]);
       db.prepare(
@@ -131,27 +155,24 @@ export function applyPatches(patches: Patch[]): void {
       ).run(params);
     }
   });
-  run(patches);
 }
 
 export function deleteTasks(ids: string[]): void {
   if (ids.length === 0) return;
   const db = getDb();
   const stmt = db.prepare(`DELETE FROM tasks WHERE "id" = ?`);
-  const run = db.transaction((items: string[]) => {
-    for (const id of items) stmt.run(id);
+  inTransaction(db, () => {
+    for (const id of ids) stmt.run(id);
   });
-  run(ids);
 }
 
 /** Import mode replace: tukar seluruh isi tabel dalam satu transaksi. */
 export function replaceAll(tasks: Task[]): void {
   const db = getDb();
-  const run = db.transaction((items: Task[]) => {
+  inTransaction(db, () => {
     db.prepare(`DELETE FROM tasks`).run();
-    if (items.length) insertTasks(items);
+    if (tasks.length) insertTasksWith(db, tasks);
   });
-  run(tasks);
 }
 
 export function getMeta(key: string): string | null {

@@ -12,6 +12,8 @@ npm install
 npm run dev      # http://localhost:3939
 ```
 
+Memerlukan Node.js 22.13 atau lebih baru.
+
 Database SQLite dibuat otomatis di `data/zeno-work.db` saat pertama dijalankan,
 dan diisi contoh susunan kerja supaya layar pertama tidak kosong.
 
@@ -20,6 +22,30 @@ npm test         # pemeriksaan logika pohon, roll-up, sorting, filter
 npm run build    # build produksi
 npm run typecheck
 ```
+
+## Desktop (Electron)
+
+Versi desktop membuka server Next.js lokal secara internal; pengguna tidak
+perlu menjalankan terminal atau membuka browser. Database dan backup disimpan
+permanen di folder data aplikasi sistem
+(`~/Library/Application Support/ZenoWork/data` di macOS atau
+`%APPDATA%\\ZenoWork\\data` di Windows), sehingga upgrade aplikasi tidak
+menimpa data pekerjaan.
+
+```bash
+npm run desktop:dev           # pengembangan: Next + jendela Electron
+npm run desktop:pack          # buat ZenoWork.app tanpa installer
+npm run desktop:dist:mac      # buat DMG + ZIP macOS di release/
+npm run desktop:dist:win      # buat installer + portable EXE Windows
+```
+
+Jalankan perintah distribusi pada sistem targetnya agar runtime native yang
+terpaket sesuai: macOS untuk DMG/ZIP, Windows x64 untuk installer/portable EXE.
+
+Untuk pindah instalasi atau sistem operasi, pilih **Export JSON (backup data)**
+di aplikasi lama, lalu **Import JSON (pulihkan data)** di aplikasi baru. Import
+meminta konfirmasi sebelum mengganti seluruh task. Setelan AI dan kunci API
+tidak ikut diekspor, sehingga harus diatur kembali di perangkat baru.
 
 ## Yang sudah jalan
 
@@ -31,6 +57,8 @@ npm run typecheck
   anak, status diturunkan. Sel induk read-only.
 - Timeline: bar per task, bar ringkasan untuk induk, garis hari ini, weekend
   diarsir, zoom Hari/Minggu/Bulan.
+- View kalender bulanan: task tampil di setiap tanggal dalam rentangnya,
+  navigasi bulan, sinkron dengan filter dan selection, serta opsi hanya task daun.
 - **Simpan eksplisit**: perubahan ditahan di memori; tombol **Simpan N**
   muncul di kanan atas saat ada yang berubah, atau tekan `⌘S`. Menutup tab
   dengan perubahan yang belum disimpan akan dikonfirmasi dulu.
@@ -72,5 +100,5 @@ lib/rollup.ts    rangkai pohon, hitung nomor WBS dan nilai roll-up
 lib/rows.ts      baris yang digambar: hierarki → collapse → filter
 lib/schedule.ts  geometri timeline (tanggal ↔ px, snapping)
 lib/store.ts     state klien, undo/redo, sinkronisasi selisih ke server
-lib/db.ts        SQLite, semua tulisan dalam transaksi
+lib/db.ts        SQLite bawaan Node, semua tulisan dalam transaksi
 ```

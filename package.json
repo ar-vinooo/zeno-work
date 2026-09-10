@@ -1,18 +1,29 @@
 {
   "name": "zeno-work",
   "version": "0.1.0",
+  "description": "Aplikasi desktop manajemen pekerjaan personal dengan WBS, timeline, dan kalender.",
+  "author": "Zeno",
   "private": true,
+  "main": "electron/main.cjs",
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "scripts": {
     "dev": "node --env-file-if-exists=.env node_modules/next/dist/bin/next dev",
     "build": "next build",
     "start": "node --env-file-if-exists=.env node_modules/next/dist/bin/next start",
+    "desktop:dev": "node electron/dev.cjs",
+    "desktop:start": "node electron/run.cjs",
+    "desktop:pack": "npm run build && electron-builder --dir",
+    "desktop:dist": "npm run build && electron-builder --mac",
+    "desktop:dist:mac": "npm run build && electron-builder --mac",
+    "desktop:dist:win": "npm run build && electron-builder --win --x64",
     "typecheck": "tsc --noEmit",
     "test": "tsx scripts/check-tree.ts",
     "import": "tsx scripts/import-outline.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
-    "better-sqlite3": "^11.10.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",
     "date-fns": "^4.1.0",
@@ -32,13 +43,70 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
     "playwright": "^1.63.0",
     "tailwindcss": "^4.1.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
+  },
+  "build": {
+    "appId": "com.zeno.zenowork",
+    "productName": "ZenoWork",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/main.cjs",
+      "package.json",
+      "!node_modules/**/*",
+      "!.env*",
+      "!data/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "standalone",
+        "filter": [
+          "**/*",
+          "!.env*",
+          "!data/**/*",
+          "!node_modules/**/*"
+        ]
+      },
+      {
+        "from": ".next/standalone/node_modules",
+        "to": "standalone/node_modules",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": ".next/static",
+        "to": "standalone/.next/static",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.icns",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    }
   }
 }
