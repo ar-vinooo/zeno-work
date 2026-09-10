@@ -26,7 +26,7 @@ import { useStore } from "@/lib/store";
 import { useThemeMode } from "@/lib/theme";
 import { childrenOf, subtreeIds, topMost } from "@/lib/tree";
 
-const PAD = { day: 10, week: 21, month: 60 } as const;
+const PAD = { day: 7, week: 31, month: 180 } as const;
 
 export default function App() {
   const hydrate = useStore((s) => s.hydrate);

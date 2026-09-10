@@ -141,7 +141,13 @@ export function computeRows(
   const weekStart = weekStartISO(today);
   const weekEnd = shiftISO(weekStart, 6);
 
-  const statsNodes = focusRoot ? matchedNodes : outline.all;
+  const statsNodes: TaskNode[] = [];
+  const collectStats = (node: TaskNode) => {
+    statsNodes.push(node);
+    for (const child of node.children) collectStats(child);
+  };
+  if (focusRoot) collectStats(focusRoot);
+  else statsNodes.push(...outline.all);
   for (const node of statsNodes) {
     // Hitung daun saja supaya induk tidak dihitung dobel dengan anaknya.
     if (node.children.length > 0) continue;
@@ -164,7 +170,11 @@ export function computeRows(
       leaves: statsNodes.filter((n) => n.children.length === 0).length,
       byStatus,
       overdue,
-      avgProgress: activeCount ? Math.round(activeSum / activeCount) : 0,
+      avgProgress: focusRoot
+        ? focusRoot.eff.progress
+        : activeCount
+          ? Math.floor(activeSum / activeCount)
+          : 0,
       thisWeek,
     },
   };

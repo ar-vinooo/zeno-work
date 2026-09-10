@@ -96,7 +96,7 @@ function parseWeek(cell: string, edge: "start" | "end"): string {
 
 function parseProgress(cell: string): number {
   const n = Number(cell.replace("%", "").trim());
-  return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.floor(n))) : 0;
 }
 
 function read(file: string): Entry[] {

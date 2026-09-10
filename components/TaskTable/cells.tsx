@@ -104,7 +104,7 @@ export function ProgressTrack({ value, readOnly, onChange, children }: ProgressP
   const setFromEvent = (clientX: number) => {
     const box = ref.current?.getBoundingClientRect();
     if (!box || box.width === 0) return;
-    const pct = Math.round(((clientX - box.left) / box.width) * 100);
+    const pct = Math.floor(((clientX - box.left) / box.width) * 100);
     onChange(Math.max(0, Math.min(100, pct)));
   };
 

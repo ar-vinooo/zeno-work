@@ -184,7 +184,7 @@ export default function Grid({
     const dw = scale.dayWidth;
     const layers: string[] = [];
     const positions: string[] = [];
-    if (scale.unit !== "month") {
+    if (scale.unit === "day") {
       // Tembus pandang, bukan warna pekat: arsiran ini menumpang di atas warna
       // baris, dan warna baris bisa berubah (terpilih, induk, ditandai AI).
       // Dengan warna pekat, kolom akhir pekan menimpanya — baris terpilih jadi
@@ -194,14 +194,15 @@ export default function Grid({
       );
       positions.push("0 0");
     }
-    if (dw >= 12) {
+    if (scale.unit === "day") {
       layers.push(
         `repeating-linear-gradient(to right, var(--color-line) 0 1px, transparent 1px ${dw}px)`,
       );
       positions.push("0 0");
     }
+    const major = scale.unit === "month" ? dw * 28 : dw * 7;
     layers.push(
-      `repeating-linear-gradient(to right, var(--color-line-strong) 0 1px, transparent 1px ${7 * dw}px)`,
+      `repeating-linear-gradient(to right, var(--color-line-strong) 0 1px, transparent 1px ${major}px)`,
     );
     positions.push("0 0");
     return {

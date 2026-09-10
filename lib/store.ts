@@ -599,7 +599,7 @@ export const useStore = create<Store>((set, get) => {
           if (typeof op[key] === "string" && ISO.test(op[key] as string))
             out[key] = op[key];
         if (typeof op.progress === "number" && Number.isFinite(op.progress))
-          out.progress = Math.max(0, Math.min(100, Math.round(op.progress)));
+          out.progress = Math.max(0, Math.min(100, Math.floor(op.progress)));
         if (typeof op.status === "string" && STATUSES.has(op.status))
           out.status = op.status;
         return out;

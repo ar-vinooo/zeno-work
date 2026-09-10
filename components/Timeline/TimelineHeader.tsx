@@ -29,17 +29,28 @@ export default function TimelineHeader({ scale, width, todayX }: Props) {
     cursor = next;
   }
 
-  const step = scale.unit === "day" ? 1 : scale.unit === "week" ? 1 : 7;
-  const ticks: { label: string; x: number }[] = [];
-  for (let i = 0; i < scale.days; i += step) {
-    const date = shiftISO(scale.origin, i);
-    ticks.push({
-      label:
-        scale.unit === "month"
-          ? format(fromISO(date), "d/M")
-          : format(fromISO(date), "d"),
-      x: xForDate(scale, date),
-    });
+  const step = scale.unit === "day" ? 1 : 7;
+  const ticks: { label: string; x: number; w: number }[] = [];
+  if (scale.unit === "month") {
+    for (const month of months)
+      ticks.push({
+        label: month.label.split(" ")[0],
+        x: month.x,
+        w: month.w,
+      });
+  } else {
+    for (let i = 0; i < scale.days; i += step) {
+      const date = shiftISO(scale.origin, i);
+      const d = fromISO(date);
+      ticks.push({
+        label:
+          scale.unit === "week"
+            ? format(d, "'W'w MMM", { locale: localeId })
+            : format(d, "d"),
+        x: xForDate(scale, date),
+        w: scale.dayWidth * step,
+      });
+    }
   }
 
   return (
@@ -60,9 +71,9 @@ export default function TimelineHeader({ scale, width, todayX }: Props) {
           <div
             key={t.x}
             className="num absolute top-0 text-center text-[9px] leading-5 text-[var(--color-faint)]"
-            style={{ left: t.x, width: scale.dayWidth * step }}
+            style={{ left: t.x, width: t.w }}
           >
-            {scale.dayWidth >= 12 || scale.unit === "month" ? t.label : ""}
+            {t.label}
           </div>
         ))}
         <div

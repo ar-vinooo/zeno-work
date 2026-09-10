@@ -5,9 +5,9 @@ export type ZoomUnit = "day" | "week" | "month";
 
 /** Lebar satu hari dalam px per level zoom. */
 export const DAY_WIDTH: Record<ZoomUnit, number> = {
-  day: 34,
-  week: 16,
-  month: 5,
+  day: 18,
+  week: 8,
+  month: 2,
 };
 
 export interface Scale {

@@ -580,7 +580,9 @@ export default function Toolbar({
         >
           {stats.overdue} overdue
         </span>
-        <span>{stats.avgProgress}% rata-rata progres aktif</span>
+        <span>
+          {stats.avgProgress}% {focusRootId ? "progres fokus" : "rata-rata progres aktif"}
+        </span>
         <span>{stats.thisWeek} task minggu ini</span>
       </div>
 

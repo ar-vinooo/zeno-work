@@ -1,7 +1,7 @@
 import type { Patch, Status, Task } from "./types";
 
 const STATUSES: Status[] = ["todo", "in_progress", "blocked", "done"];
-const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+const clamp = (n: number) => Math.max(0, Math.min(100, Math.floor(n)));
 
 /**
  * Aturan §4.5 PRD, dipakai di halaman (optimistis) DAN di proses utama (sumber
