@@ -64,7 +64,7 @@ jobs:
             release/*.zip
             release/*.exe
             release/*.blockmap
-            release/*.yml
+            release/latest*.yml
 
   release:
     name: Terbitkan Release
