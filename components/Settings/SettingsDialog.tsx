@@ -119,7 +119,7 @@ export default function SettingsDialog() {
           <DialogTitle>Setelan</DialogTitle>
           <DialogDescription>
             Tersimpan di database aplikasi, bukan di berkas .env — jadi berlaku
-            langsung tanpa menjalankan ulang server.
+            langsung tanpa membuka ulang aplikasi.
           </DialogDescription>
         </DialogHeader>
 
@@ -303,10 +303,9 @@ export default function SettingsDialog() {
                     )}
                   </div>
                   <p className="mt-1 text-[10px] text-[var(--color-ink-soft)]">
-                    Disimpan apa adanya di{" "}
-                    <span className="num">data/zeno-work.db</span> dan tidak
-                    pernah dikirim balik ke browser. Berkas itu sudah diabaikan
-                    git, tapi jangan dibagikan.
+                    Disimpan apa adanya di database aplikasi dan tidak pernah
+                    dikirim balik ke halaman — hanya proses utama yang
+                    menyentuhnya. Berkasnya di luar repo, tapi jangan dibagikan.
                   </p>
                 </div>
 

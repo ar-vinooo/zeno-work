@@ -4,7 +4,7 @@ const STATUSES: Status[] = ["todo", "in_progress", "blocked", "done"];
 const clamp = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
 
 /**
- * Aturan §4.5 PRD, dipakai di klien (optimistis) DAN di server (sumber
+ * Aturan §4.5 PRD, dipakai di halaman (optimistis) DAN di proses utama (sumber
  * kebenaran) supaya keduanya tidak pernah berbeda hasil.
  */
 export function applyRules(current: Task, patch: Patch): Patch {

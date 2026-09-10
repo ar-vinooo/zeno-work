@@ -34,7 +34,7 @@ const TEXT_KEYS = [
 
 type TextKey = (typeof TEXT_KEYS)[number];
 
-/** Yang boleh dilihat browser. Kunci API sengaja tidak pernah ikut. */
+/** Yang boleh dilihat halaman. Kunci API sengaja tidak pernah ikut. */
 export interface PublicSettings {
   aiProvider: AiProvider;
   anthropicModel: string;

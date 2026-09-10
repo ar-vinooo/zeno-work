@@ -1,7 +1,7 @@
 import { todayISO } from "./dates";
 import { isActive, isOverdue } from "./derive";
 import { buildOutline, type Outline } from "./rollup";
-import type { Filters, Row, SortSpec, Status, Task, TaskNode } from "./types";
+import type { Filters, Row, Status, Task, TaskNode } from "./types";
 import { weekStartISO, shiftISO, rangeBounds, type RangeKind } from "./dates";
 
 export interface Stats {
@@ -26,7 +26,11 @@ function matches(node: TaskNode, f: Filters, today: string): boolean {
   const q = f.query.trim().toLowerCase();
   if (q && !node.task.title.toLowerCase().includes(q) && !node.wbs.startsWith(q))
     return false;
-  if (f.range !== "all") {
+  if (f.range === "from") {
+    // Tanggal pilihan sendiri, tanpa batas akhir. Selama tanggalnya belum
+    // diisi, filter ini belum berarti apa-apa — jangan sembunyikan apa pun.
+    if (f.fromDate && node.eff.end < f.fromDate) return false;
+  } else if (f.range !== "all") {
     // Cocok bila rentang task beririsan dengan periode, bukan harus termuat
     // penuh. Varian "-onward" membuang batas akhirnya: apa pun yang belum
     // selesai sebelum periode dimulai ikut tampil, sejauh apa pun ke depan.
@@ -60,13 +64,9 @@ export interface RowsResult {
  * cocok ikut ditampilkan sebagai konteks (§5.6 PRD) — kalau tidak, hasil
  * pencarian bisa tersembunyi di dalam induk yang kebetulan tertutup.
  */
-export function computeRows(
-  tasks: Task[],
-  sort: SortSpec,
-  filters: Filters,
-): RowsResult {
+export function computeRows(tasks: Task[], filters: Filters): RowsResult {
   const today = todayISO();
-  const outline = buildOutline(tasks, sort);
+  const outline = buildOutline(tasks);
   const filtering = filterActive(filters);
 
   const matched = new Set<string>();

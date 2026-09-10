@@ -1,6 +1,5 @@
 import { durationOf, maxISO, minISO } from "./dates";
-import { sortSiblings } from "./sort";
-import type { Effective, SortSpec, Task, TaskNode } from "./types";
+import type { Effective, Task, TaskNode } from "./types";
 
 /**
  * Nilai efektif satu induk dari anak-anaknya (§4.3 PRD):
@@ -52,11 +51,11 @@ export interface Outline {
 /**
  * Rangkai daftar datar jadi pohon bernomor.
  *
- * Urutan langkah penting: eff dihitung SEBELUM sorting, karena sorting
- * berdasarkan Start/End/Progress memakai nilai roll-up induk — kalau dibalik,
- * induk akan diurutkan memakai nilai yang belum ada.
+ * Urutan baris SELALU urutan manual: `order` di antara saudara sekandung.
+ * Tidak ada pengurutan per kolom — mengurutkan tabel WBS berarti nomor
+ * hierarkinya berubah arti, dan itu justru menghilangkan gunanya.
  */
-export function buildOutline(tasks: Task[], sort: SortSpec): Outline {
+export function buildOutline(tasks: Task[]): Outline {
   const kids = new Map<string | null, Task[]>();
   for (const t of tasks) {
     const list = kids.get(t.parentId);
@@ -84,8 +83,7 @@ export function buildOutline(tasks: Task[], sort: SortSpec): Outline {
     };
   };
 
-  let roots = (kids.get(null) ?? []).map(build);
-  roots = sortSiblings(roots, sort);
+  const roots = (kids.get(null) ?? []).map(build);
 
   const all: TaskNode[] = [];
   const byId = new Map<string, TaskNode>();

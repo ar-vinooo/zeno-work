@@ -31,7 +31,6 @@ export default function App() {
   const tasks = useStore((s) => s.tasks);
   const hydrated = useStore((s) => s.hydrated);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const sort = useStore((s) => s.sort);
   const filters = useStore((s) => s.filters);
   const zoom = useStore((s) => s.zoom);
   const store = useStore;
@@ -66,8 +65,8 @@ export default function App() {
   }, [hydrate]);
 
   const { rows, matchedNodes, stats, outline } = useMemo(
-    () => computeRows(tasks, sort, filters),
-    [tasks, sort, filters],
+    () => computeRows(tasks, filters),
+    [tasks, filters],
   );
 
   const scale = useMemo(() => {

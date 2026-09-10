@@ -9,7 +9,7 @@ import { join } from "node:path";
  * Berguna untuk pemakaian lokal: kalau CLI-nya sudah login, pemakaiannya masuk
  * ke langganan yang sama, bukan tagihan per token yang terpisah.
  *
- * Catatan keamanan: ini menjalankan proses di mesin yang menjalankan server.
+ * Catatan keamanan: ini menjalankan proses di mesin yang menjalankan aplikasi.
  * Aman selama aplikasinya lokal seperti sekarang, dan TIDAK boleh diaktifkan
  * bila suatu saat aplikasinya di-hosting. Karena itu prompt dikirim lewat
  * stdin (bukan argumen), shell tidak pernah dipakai, dan semua tool CLI-nya

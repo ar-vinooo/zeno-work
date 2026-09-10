@@ -4,8 +4,6 @@ import { listTasks } from "./db";
 import { buildOutline } from "./rollup";
 import { STATUS_LABEL, type TaskNode } from "./types";
 
-const MANUAL = { column: "manual", dir: "asc" } as const;
-
 const line = (n: TaskNode, today: string) =>
   `${n.wbs}\t${n.task.title}\t${n.eff.progress}%\t${n.eff.start}..${n.eff.end}\t${durationOf(n.eff.start, n.eff.end)}h\t${STATUS_LABEL[n.eff.status]}${
     n.children.length ? "\t[induk]" : ""
@@ -25,7 +23,7 @@ export interface FindArgs {
 }
 
 export function findTasks(args: FindArgs): string {
-  const outline = buildOutline(listTasks(), MANUAL);
+  const outline = buildOutline(listTasks());
   const today = todayISO();
   const q = (args.query ?? "").trim().toLowerCase();
   const limit = Math.max(1, Math.min(args.limit ?? 40, 120));
@@ -48,7 +46,7 @@ export function findTasks(args: FindArgs): string {
 }
 
 export function getSubtree(wbs: string, depth = 2): string {
-  const outline = buildOutline(listTasks(), MANUAL);
+  const outline = buildOutline(listTasks());
   const today = todayISO();
   const root = outline.all.find((n) => n.wbs === wbs);
   if (!root) return `Tidak ada baris bernomor ${wbs}.`;

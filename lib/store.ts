@@ -22,13 +22,7 @@ import { buildOutline } from "./rollup";
 import { MAX_TASKS_PER_CALL, type AiNewTask, type AiOperation } from "./ai";
 import { shiftISO, diffDays } from "./dates";
 import { EMPTY_FILTERS } from "./types";
-import type {
-  Filters,
-  Patch,
-  SortColumn,
-  SortSpec,
-  Task,
-} from "./types";
+import type { Filters, Patch, Task } from "./types";
 import type { ZoomUnit } from "./schedule";
 
 interface Diff {
@@ -79,7 +73,7 @@ function diffTasks(prev: Task[], next: Task[]): Diff {
 
 const COLLAPSE_KEY = "zenowork.collapsed";
 
-/** Simpan status buka/tutup di browser — sama kategorinya dengan lebar kolom. */
+/** Simpan status buka/tutup di localStorage — sama kategorinya dengan lebar kolom. */
 function persistCollapsed(tasks: Task[]) {
   try {
     localStorage.setItem(
@@ -91,7 +85,7 @@ function persistCollapsed(tasks: Task[]) {
   }
 }
 
-/** Terapkan status tersimpan. Bila belum pernah ada, nilai dari server dipakai. */
+/** Terapkan status tersimpan. Bila belum pernah ada, nilai dari database dipakai. */
 function restoreCollapsed(tasks: Task[]): Task[] {
   try {
     const raw = localStorage.getItem(COLLAPSE_KEY);
@@ -130,7 +124,6 @@ interface Store {
   selection: string[];
   anchorId: string | null;
   editing: CellRef | null;
-  sort: SortSpec;
   filters: Filters;
   zoom: ZoomUnit;
   showDuration: boolean;
@@ -148,6 +141,8 @@ interface Store {
 
   hydrate: (tasks: Task[]) => void;
   save: () => Promise<void>;
+  /** Buang perubahan yang belum disimpan, kembali ke kondisi di database. */
+  discard: () => void;
   patchTask: (id: string, patch: Omit<Patch, "id">) => void;
   addSiblingAfter: (id: string | null) => string;
   addChildOf: (id: string) => string;
@@ -163,8 +158,6 @@ interface Store {
   select: (id: string, mode?: "replace" | "toggle" | "range", ordered?: string[]) => void;
   clearSelection: () => void;
   setEditing: (cell: CellRef | null) => void;
-  setSortColumn: (column: SortColumn) => void;
-  applySortAsOrder: () => void;
   refresh: () => Promise<void>;
   setFilters: (patch: Partial<Filters>) => void;
   resetFilters: () => void;
@@ -204,7 +197,6 @@ export const useStore = create<Store>((set, get) => {
     selection: [],
     anchorId: null,
     editing: null,
-    sort: { column: "manual", dir: "asc" },
     filters: EMPTY_FILTERS,
     zoom: "week",
     showDuration: false,
@@ -257,6 +249,43 @@ export const useStore = create<Store>((set, get) => {
       } finally {
         set((s) => ({ saving: Math.max(0, s.saving - 1) }));
       }
+    },
+
+    /**
+     * Kembali ke kondisi terakhir yang benar-benar ada di database.
+     *
+     * Tetap satu langkah undo: salah tekan tidak boleh berarti kehilangan
+     * pekerjaan setengah jam. Status buka/tutup baris sengaja dipertahankan —
+     * itu tampilan, bukan data, dan mengembalikannya ikut membuka baris yang
+     * barusan kamu tutup rapi.
+     */
+    discard: () => {
+      const { baseline, tasks } = get();
+      if (countDiff(diffTasks(baseline, tasks)) === 0) return;
+
+      const collapsedNow = new Map(tasks.map((t) => [t.id, t.collapsed]));
+      const restored = baseline.map((t) => {
+        const collapsed = collapsedNow.get(t.id);
+        return collapsed === undefined || collapsed === t.collapsed
+          ? t
+          : { ...t, collapsed };
+      });
+      // Baris yang tadi baru dibuat ikut hilang, jadi apa pun yang menunjuk
+      // ke sana harus dilepas — kalau tidak, seleksi menunjuk baris hantu.
+      const alive = new Set(restored.map((t) => t.id));
+
+      set((s) => ({
+        tasks: restored,
+        past: [...s.past, tasks].slice(-HISTORY_LIMIT),
+        future: [],
+        pending: 0,
+        aiTouched: [],
+        preview: null,
+        editing: null,
+        error: null,
+        selection: s.selection.filter((id) => alive.has(id)),
+        anchorId: s.anchorId && alive.has(s.anchorId) ? s.anchorId : null,
+      }));
     },
 
     patchTask: (id, patch) => {
@@ -328,7 +357,7 @@ export const useStore = create<Store>((set, get) => {
     },
 
     // Buka/tutup hanya mengubah tampilan: tidak menandai ada yang perlu
-    // disimpan, tidak masuk riwayat undo, dan tidak pernah dikirim ke server.
+    // disimpan, tidak masuk riwayat undo, dan tidak pernah dikirim lewat IPC.
     toggleCollapse: (id) => {
       const tasks = get().tasks.map((t) =>
         t.id === id ? { ...t, collapsed: !t.collapsed } : t,
@@ -411,31 +440,6 @@ export const useStore = create<Store>((set, get) => {
     clearSelection: () => set({ selection: [], anchorId: null }),
     setEditing: (cell) => set({ editing: cell }),
 
-    setSortColumn: (column) => {
-      const { sort } = get();
-      if (column === "manual") return set({ sort: { column: "manual", dir: "asc" } });
-      if (sort.column !== column) return set({ sort: { column, dir: "asc" } });
-      if (sort.dir === "asc") return set({ sort: { column, dir: "desc" } });
-      return set({ sort: { column: "manual", dir: "asc" } });
-    },
-
-    /** Tulis urutan tampilan hasil sorting ke `order` lalu kembali ke Manual. */
-    applySortAsOrder: () => {
-      const { tasks, sort } = get();
-      if (sort.column === "manual") return;
-      const outline = buildOutline(tasks, sort);
-      const patches: Patch[] = [];
-      const walk = (nodes: typeof outline.roots) => {
-        nodes.forEach((node, i) => {
-          if (node.task.order !== i) patches.push({ id: node.task.id, order: i });
-          walk(node.children);
-        });
-      };
-      walk(outline.roots);
-      commit(applyPatchList(tasks, patches));
-      set({ sort: { column: "manual", dir: "asc" } });
-    },
-
     refresh: async () => {
       const restored = restoreCollapsed(await zeno().tasks.load());
       set({
@@ -462,7 +466,7 @@ export const useStore = create<Store>((set, get) => {
       // berdasarkan keadaan yang dia lihat, dan nomor bergeser begitu ada
       // baris yang ditambah atau dihapus. Baris baru tidak butuh nomor karena
       // hubungan induk-anaknya sudah tersusun lewat `children`.
-      const outline = buildOutline(tasks, { column: "manual", dir: "asc" });
+      const outline = buildOutline(tasks);
       const idOf = new Map(outline.all.map((n) => [n.wbs, n.task.id]));
       const titleOf = new Map(outline.all.map((n) => [n.wbs, n.task.title]));
       const log: string[] = [];

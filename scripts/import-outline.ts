@@ -227,7 +227,7 @@ if (existing.length) {
 replaceAll(tasks);
 setMeta("seeded", new Date().toISOString());
 
-const outline = buildOutline(listTasks(), { column: "manual", dir: "asc" });
+const outline = buildOutline(listTasks());
 const depths = new Map<number, number>();
 for (const n of outline.all)
   depths.set(n.depth + 1, (depths.get(n.depth + 1) ?? 0) + 1);

@@ -111,10 +111,13 @@ export function ProgressTrack({ value, readOnly, onChange, children }: ProgressP
   return (
     <div
       ref={ref}
-      className={`relative h-[9px] w-full overflow-hidden rounded-[2px] ${
+      className={`relative h-[7px] w-full overflow-hidden rounded-full ${
         readOnly ? "" : "cursor-ew-resize"
       }`}
-      style={{ background: "var(--color-raised)" }}
+      // Alur digelapkan dari warna baris, bukan diberi warna tetap: baris bisa
+      // putih, bisa pita induk, bisa biru saat terpilih. Warna tetap membuat
+      // alur 0% hilang di baris putih dan justru lebih terang dari baris induk.
+      style={{ background: "color-mix(in srgb, var(--color-ink) 10%, transparent)" }}
       onPointerDown={(e) => {
         if (readOnly || e.button !== 0) return;
         e.preventDefault();
@@ -129,10 +132,17 @@ export function ProgressTrack({ value, readOnly, onChange, children }: ProgressP
       }}
     >
       <div
-        className="h-full"
+        className="h-full rounded-full"
         style={{
           width: `${value}%`,
-          background: readOnly ? "var(--color-line-strong)" : "var(--color-bar-fill)",
+          // Hijau begitu penuh, dan hijaunya PERSIS hijau bar Gantt — dua bar
+          // itu berdiri di baris yang sama, jadi keduanya harus warna yang
+          // sama. Isian pakai --color-bar; teks dan titik pakai --color-done
+          // yang lebih gelap, karena keduanya butuh kontras untuk terbaca.
+          background: value >= 100 ? "var(--color-bar)" : "var(--color-bar-fill)",
+          // Baris induk tidak lagi diberi warna berbeda — yang menandainya
+          // read-only adalah teks persen yang redup dan kursornya.
+          opacity: readOnly ? 0.55 : 1,
         }}
       />
       {children}

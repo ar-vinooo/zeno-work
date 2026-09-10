@@ -98,7 +98,7 @@ export const xlsxFileName = () =>
   `zenowork-dtdi-${new Date().toISOString().slice(0, 10)}.xlsx`;
 
 export async function buildTimelineWorkbook(): Promise<Buffer> {
-  const outline = buildOutline(listTasks(), { column: "manual", dir: "asc" });
+  const outline = buildOutline(listTasks());
   const nodes = outline.all;
 
   const wb = new ExcelJS.Workbook();

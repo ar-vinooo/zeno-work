@@ -49,20 +49,6 @@ export interface Row extends TaskNode {
 /** Perubahan parsial yang dikirim ke API sebagai satu transaksi. */
 export type Patch = { id: string } & Partial<Omit<Task, "id">>;
 
-export type SortColumn =
-  | "manual"
-  | "title"
-  | "progress"
-  | "start"
-  | "end"
-  | "status"
-  | "priority";
-
-export interface SortSpec {
-  column: SortColumn;
-  dir: "asc" | "desc";
-}
-
 /**
  * Rentang tanggal cepat di toolbar. "all" = tanpa batas periode.
  * Akhiran "-onward" = dari awal periode itu ke depan, tanpa batas akhir.
@@ -74,11 +60,15 @@ export type DateRange =
   | "month"
   | "today-onward"
   | "week-onward"
-  | "month-onward";
+  | "month-onward"
+  /** Sejak tanggal yang kamu pilih sendiri, tanpa batas akhir. */
+  | "from";
 
 export interface Filters {
   query: string;
   range: DateRange;
+  /** Dipakai hanya saat range === "from". ISO, kosong = belum dipilih. */
+  fromDate: string;
   status: Status[];
   priority: Priority[];
   hideDone: boolean;
@@ -89,6 +79,7 @@ export interface Filters {
 export const EMPTY_FILTERS: Filters = {
   query: "",
   range: "all",
+  fromDate: "",
   status: [],
   priority: [],
   hideDone: false,
@@ -111,6 +102,7 @@ export const RANGE_LABEL: Record<DateRange, string> = {
   "today-onward": "Hari ini ke depan",
   "week-onward": "Minggu ini ke depan",
   "month-onward": "Bulan ini ke depan",
+  from: "Dari tanggal",
 };
 
 export const PRIORITY_LABEL: Record<Priority, string> = {

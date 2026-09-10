@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   CalendarDays,
   ChevronsDownUp,
@@ -10,6 +10,7 @@ import {
   Download,
   Filter,
   Redo2,
+  RotateCcw,
   Save,
   Search,
   Settings,
@@ -18,7 +19,7 @@ import {
   Undo2,
   Upload,
 } from "lucide-react";
-import { Button } from "@/components/animate-ui/components/buttons/button";
+import { Button, buttonVariants } from "@/components/animate-ui/components/buttons/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -30,6 +31,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/animate-ui/components/radix/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/animate-ui/components/radix/alert-dialog";
 import {
   Tooltip,
   TooltipContent,
@@ -43,7 +54,7 @@ import {
 import { zeno } from "@/lib/bridge";
 import { useStore } from "@/lib/store";
 import { buildOutline } from "@/lib/rollup";
-import { durationOf } from "@/lib/dates";
+import { durationOf, todayISO } from "@/lib/dates";
 import {
   RANGE_LABEL,
   STATUS_LABEL,
@@ -101,9 +112,6 @@ export default function Toolbar({
   const filters = useStore((s) => s.filters);
   const setFilters = useStore((s) => s.setFilters);
   const resetFilters = useStore((s) => s.resetFilters);
-  const sort = useStore((s) => s.sort);
-  const setSortColumn = useStore((s) => s.setSortColumn);
-  const applySortAsOrder = useStore((s) => s.applySortAsOrder);
   const zoom = useStore((s) => s.zoom);
   const setZoom = useStore((s) => s.setZoom);
   const setAllCollapsed = useStore((s) => s.setAllCollapsed);
@@ -117,12 +125,14 @@ export default function Toolbar({
   const error = useStore((s) => s.error);
   const pending = useStore((s) => s.pending);
   const save = useStore((s) => s.save);
+  const discard = useStore((s) => s.discard);
   const refresh = useStore((s) => s.refresh);
 
   const fileRef = useRef<HTMLInputElement>(null);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
 
   const exportCsv = () => {
-    const outline = buildOutline(tasks, { column: "manual", dir: "asc" });
+    const outline = buildOutline(tasks);
     const head = "wbs,task,progress,start,end,durasi,status,parentId,id";
     const lines = outline.all.map((n) =>
       [
@@ -141,7 +151,7 @@ export default function Toolbar({
   };
 
   const exportMarkdown = () => {
-    const outline = buildOutline(tasks, { column: "manual", dir: "asc" });
+    const outline = buildOutline(tasks);
     const lines = outline.all.map(
       (n) =>
         `${"  ".repeat(n.depth)}- **${n.wbs}** ${n.task.title} — ${n.eff.progress}% · ${n.eff.start} → ${n.eff.end}`,
@@ -192,9 +202,8 @@ export default function Toolbar({
   );
 
   return (
-    <header className="shrink-0 border-b border-[var(--color-line)] bg-[var(--color-raised)]">
+    <header className="shrink-0 border-b border-[var(--color-line)] bg-white">
       <div className="flex h-11 items-center gap-2 px-3">
-        <span className="text-[13px] font-semibold tracking-tight">ZenoWork</span>
 
         <Tabs
           value={view}
@@ -230,7 +239,9 @@ export default function Toolbar({
               Filter
               {filters.range !== "all" && (
                 <span className="rounded bg-[var(--color-mark)]/15 px-1 text-[10px] text-[var(--color-mark)]">
-                  {RANGE_LABEL[filters.range]}
+                  {filters.range === "from" && filters.fromDate
+                    ? `Sejak ${filters.fromDate}`
+                    : RANGE_LABEL[filters.range]}
                 </span>
               )}
             </Button>
@@ -250,14 +261,41 @@ export default function Toolbar({
             <DropdownMenuLabel>Sejak periode itu ke depan</DropdownMenuLabel>
             <DropdownMenuRadioGroup
               value={filters.range}
-              onValueChange={(v) => setFilters({ range: v as DateRange })}
+              onValueChange={(v) =>
+                setFilters(
+                  // Memilih "Dari tanggal" tanpa tanggal tidak berarti apa-apa,
+                  // jadi hari ini dipakai sebagai titik awal sampai diubah.
+                  v === "from" && !filters.fromDate
+                    ? { range: "from", fromDate: todayISO() }
+                    : { range: v as DateRange },
+                )
+              }
             >
               {ONWARD_RANGES.map((r) => (
                 <DropdownMenuRadioItem key={r} value={r}>
                   {RANGE_LABEL[r]}
                 </DropdownMenuRadioItem>
               ))}
+              <DropdownMenuRadioItem value="from">
+                {RANGE_LABEL.from}
+              </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
+            {/* Kotak tanggalnya menutup menu kalau tidak dicegah. Mengetik di
+                sini sekaligus memilih rentangnya — dua klik jadi satu. */}
+            <DropdownMenuItem
+              className="focus:bg-transparent"
+              onSelect={(e) => e.preventDefault()}
+            >
+              <input
+                type="date"
+                aria-label="Tampilkan sejak tanggal"
+                value={filters.fromDate}
+                onChange={(e) =>
+                  setFilters({ fromDate: e.target.value, range: "from" })
+                }
+                className="h-7 w-full rounded-md border border-[var(--color-line)] bg-[var(--color-surface)] px-2 text-[12px] outline-none focus:border-[var(--color-mark)]"
+              />
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Tampilkan</DropdownMenuLabel>
             <DropdownMenuCheckboxItem
@@ -300,35 +338,6 @@ export default function Toolbar({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Mode urutan (§5.3): sorting tidak pernah menulis ulang urutan manual
-            kecuali diminta lewat tombol ini. */}
-        {view === "table" && (sort.column === "manual" ? (
-          <span className="rounded border border-[var(--color-line)] px-1.5 py-0.5 text-[11px] text-[var(--color-ink-soft)]">
-            Urutan manual
-          </span>
-        ) : (
-          <div className="flex items-center gap-1">
-            <span className="rounded border border-[var(--color-mark)] px-1.5 py-0.5 text-[11px] text-[var(--color-mark)]">
-              Terurut: {sort.column} {sort.dir === "asc" ? "↑" : "↓"}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-[11px]"
-              onClick={applySortAsOrder}
-            >
-              Jadikan urutan manual
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 text-[11px]"
-              onClick={() => setSortColumn("manual")}
-            >
-              Batal
-            </Button>
-          </div>
-        ))}
 
         <div className="ml-auto flex items-center gap-1.5">
           {error && (
@@ -337,16 +346,31 @@ export default function Toolbar({
 
           {/* Perubahan hanya ada di memori sampai tombol ini ditekan. */}
           {pending > 0 ? (
-            <Button
-              size="sm"
-              className="h-7 gap-1.5 text-[12px]"
-              disabled={saving > 0}
-              onClick={() => void save()}
-            >
-              <Save className="size-3.5" />
-              {saving > 0 ? "Menyimpan…" : `Simpan ${pending}`}
-              <span className="opacity-60">⌘S</span>
-            </Button>
+            <>
+              {/* Jalan keluar kalau suntingannya sudah telanjur jauh. Tetap
+                  lewat konfirmasi, dan tetap bisa dibatalkan dengan ⌘Z. */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 gap-1.5 text-[12px]"
+                disabled={saving > 0}
+                title="Kembalikan ke kondisi terakhir yang tersimpan"
+                onClick={() => setConfirmDiscard(true)}
+              >
+                <RotateCcw className="size-3.5" />
+                Buang
+              </Button>
+              <Button
+                size="sm"
+                className="h-7 gap-1.5 text-[12px]"
+                disabled={saving > 0}
+                onClick={() => void save()}
+              >
+                <Save className="size-3.5" />
+                {saving > 0 ? "Menyimpan…" : `Simpan ${pending}`}
+                <span className="opacity-60">⌘S</span>
+              </Button>
+            </>
           ) : (
             <span className="text-[11px] text-[var(--color-faint)]">
               Tersimpan
@@ -456,6 +480,29 @@ export default function Toolbar({
         <span>{stats.avgProgress}% rata-rata progres aktif</span>
         <span>{stats.thisWeek} task minggu ini</span>
       </div>
+
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Buang {pending} perubahan yang belum disimpan?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Tabel kembali ke kondisi terakhir yang tersimpan di database.
+              Bisa dibatalkan dengan ⌘Z selama aplikasi belum ditutup.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:flex-wrap">
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              onClick={discard}
+            >
+              Buang
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 }

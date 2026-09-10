@@ -116,7 +116,7 @@ function createWindow(startUrl: string) {
     minWidth: 1050,
     minHeight: 650,
     title: "ZenoWork",
-    backgroundColor: "#faf9f7",
+    backgroundColor: "#ebeef3",
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),

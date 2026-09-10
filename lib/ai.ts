@@ -108,7 +108,7 @@ const level1 = {
 };
 
 /**
- * Tool BACA. Dijalankan langsung di server lalu hasilnya dikembalikan ke model,
+ * Tool BACA. Dijalankan langsung di proses utama lalu hasilnya dikembalikan ke model,
  * sehingga ia bisa menelusuri dulu sebelum mengusulkan apa pun. Aman dieksekusi
  * tanpa persetujuan karena tidak mengubah apa-apa.
  */
@@ -150,7 +150,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-/** Tool TULIS. Tidak pernah dijalankan server — hanya dikumpulkan jadi usulan. */
+/** Tool TULIS. Tidak pernah dijalankan sendiri — hanya dikumpulkan jadi usulan. */
 export const TOOLS: Anthropic.Tool[] = [
   {
     name: "add_tasks",

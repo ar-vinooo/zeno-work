@@ -19,21 +19,27 @@ import { STATUS_LABEL, type Status, type TaskNode } from "@/lib/types";
 const WEEKDAYS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 const MAX_VISIBLE = 4;
 
+/**
+ * Chip kalender memakai token yang SAMA dengan pil status di tabel. Dulu
+ * warnanya dioplos sendiri di sini (`color-mix` 12–14% dari warna pekat), dan
+ * hasilnya satu status punya dua warna berbeda tergantung kamu sedang melihat
+ * tabel atau kalender.
+ */
 const statusStyle: Record<Status, CSSProperties> = {
   todo: {
-    background: "var(--color-raised)",
-    borderColor: "var(--color-line-strong)",
+    background: "var(--color-todo-soft)",
+    borderColor: "var(--color-faint)",
   },
   in_progress: {
-    background: "color-mix(in srgb, var(--color-bar-fill) 14%, var(--color-surface))",
+    background: "var(--color-progress-soft)",
     borderColor: "var(--color-bar-fill)",
   },
   blocked: {
-    background: "color-mix(in srgb, var(--color-blocked) 12%, var(--color-surface))",
+    background: "var(--color-blocked-soft)",
     borderColor: "var(--color-blocked)",
   },
   done: {
-    background: "color-mix(in srgb, var(--color-done) 12%, var(--color-surface))",
+    background: "var(--color-done-soft)",
     borderColor: "var(--color-done)",
   },
 };

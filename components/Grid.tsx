@@ -20,7 +20,7 @@ import { todayISO } from "@/lib/dates";
 import { xForDate, type Scale } from "@/lib/schedule";
 import { useStore, type CellRef } from "@/lib/store";
 import { childrenOf, subtreeIds } from "@/lib/tree";
-import type { Row, SortColumn } from "@/lib/types";
+import type { Row } from "@/lib/types";
 
 interface Props {
   rows: Row[];
@@ -44,7 +44,7 @@ interface RowDrag {
   valid: boolean;
 }
 
-const HEADERS: { key: SortColumn & ColKey; label: string }[] = [
+const HEADERS: { key: ColKey; label: string }[] = [
   { key: "title", label: "Task" },
   { key: "progress", label: "Progress" },
   { key: "status", label: "Status" },
@@ -78,12 +78,10 @@ export default function Grid({
   isEmpty,
 }: Props) {
   const tasks = useStore((s) => s.tasks);
-  const sort = useStore((s) => s.sort);
   const showDuration = useStore((s) => s.showDuration);
   const editing = useStore((s) => s.editing);
   const selection = useStore((s) => s.selection);
   const setEditing = useStore((s) => s.setEditing);
-  const setSortColumn = useStore((s) => s.setSortColumn);
   const select = useStore((s) => s.select);
   const dropRow = useStore((s) => s.dropRow);
   const addSiblingAfter = useStore((s) => s.addSiblingAfter);
@@ -103,7 +101,6 @@ export default function Grid({
   const todayX = xForDate(scale, today);
   const ordered = useMemo(() => rows.map((r) => r.task.id), [rows]);
   const selectionSet = useMemo(() => new Set(selection), [selection]);
-  const manual = sort.column === "manual";
 
   const setVar = useCallback((key: ColKey, px: number) => {
     paneRef.current?.style.setProperty(cssVar(key), `${px}px`);
@@ -188,8 +185,12 @@ export default function Grid({
     const layers: string[] = [];
     const positions: string[] = [];
     if (scale.unit !== "month") {
+      // Tembus pandang, bukan warna pekat: arsiran ini menumpang di atas warna
+      // baris, dan warna baris bisa berubah (terpilih, induk, ditandai AI).
+      // Dengan warna pekat, kolom akhir pekan menimpanya — baris terpilih jadi
+      // biru yang terpotong-potong abu tiap Sabtu-Minggu.
       layers.push(
-        `repeating-linear-gradient(to right, transparent 0 ${5 * dw}px, var(--color-raised) ${5 * dw}px ${7 * dw}px)`,
+        `repeating-linear-gradient(to right, transparent 0 ${5 * dw}px, color-mix(in srgb, var(--color-ink) 6%, transparent) ${5 * dw}px ${7 * dw}px)`,
       );
       positions.push("0 0");
     }
@@ -250,7 +251,7 @@ export default function Grid({
    */
   const onRowDragStart = useCallback(
     (event: React.PointerEvent, id: string) => {
-      if (!manual || event.button !== 0) return;
+      if (event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
 
@@ -335,14 +336,16 @@ export default function Grid({
       window.addEventListener("pointermove", move);
       window.addEventListener("pointerup", up);
     },
-    [dropRow, manual, rows, tasks],
+    [dropRow, rows, tasks],
   );
 
   return (
     <div
       ref={scrollRef}
       className="scroll-pane relative flex-1 overflow-auto"
-      style={{ background: "var(--color-surface)" }}
+      // Kanvas, bukan putih: di bawah baris terakhir tidak boleh ada balok
+      // putih besar yang warnanya berbeda dari toolbar di atasnya.
+      style={{ background: "var(--color-canvas)" }}
     >
       <div className="min-w-max" ref={paneRef} style={initialVars(showDuration)}>
         {/* Header */}
@@ -374,18 +377,7 @@ export default function Grid({
                 className="cell relative shrink-0 justify-between border-l border-[var(--color-line)] text-[11px] text-[var(--color-ink-soft)]"
                 style={{ width: widthOf(h.key) }}
               >
-                <button
-                  className="flex min-w-0 flex-1 items-center justify-between hover:text-[var(--color-ink)]"
-                  onClick={() => setSortColumn(h.key)}
-                  title="Klik untuk mengurutkan di dalam tiap tingkat"
-                >
-                  <span className="truncate">{h.label}</span>
-                  {sort.column === h.key && (
-                    <span className="text-[var(--color-mark)]">
-                      {sort.dir === "asc" ? "↑" : "↓"}
-                    </span>
-                  )}
-                </button>
+                <span className="min-w-0 flex-1 truncate">{h.label}</span>
                 {/* Hanya Task yang bisa diubah lebarnya — judul pekerjaan
                     panjangnya tidak terduga, sedangkan kolom lain isinya
                     seragam dan sudah pas. */}

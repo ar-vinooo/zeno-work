@@ -5,28 +5,73 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-canvas: #faf9f7;
+  /* Abu-abu dingin (sedikit biru), bukan sepia. Baris induk memakai
+     #d9d9d9 / #f2f2f2 dari lembar Excel DTDI dan nilainya terkunci di sana;
+     kanvas hangat membuat abu netral itu terbaca kusam kehijauan. */
+  /* Empat tingkat latar, jaraknya RATA 2,0 L* tiap anak tangga:
+     kanvas 94,0 → n. 96,0 → n.n. 97,9 → n.n.n. 100. Diukur pakai L*, bukan
+     hex, karena mata membaca terang secara tidak linear — selisih hex yang
+     sama terasa jauh berbeda di ujung terang dibanding ujung gelap.
+     Kanvas tetap paling gelap supaya tabelnya terbaca sebagai lembar di atas
+     alas, bukan menyatu dengannya. */
+  --color-canvas: #ebeef3;
   --color-surface: #ffffff;
-  --color-raised: #f2efeb;
-  --color-line: #e4e0da;
-  --color-line-strong: #cec8c0;
-  --color-ink: #1b1a18;
-  --color-ink-soft: #6f6862;
-  --color-faint: #a49d95;
-  --color-mark: #b45309;
-  --color-mark-soft: #fdf0e0;
-  --color-bar-fill: #3f5566;
-  --color-done: #4f7a52;
-  --color-blocked: #b0503f;
-  --color-selected: #eef3f7;
+  --color-raised: #eef1f5;
+  /* Garis digelapkan dari apa pun yang ada di bawahnya, bukan warna tetap.
+     Sebagai warna tetap, garis #e8edf3 punya kontras 1,18 di atas baris putih
+     tapi 1,01 di atas pita baris induk dan 1,07 di atas pil Done — hilang sama
+     sekali. Dengan color-mix, kontrasnya seragam 1,28 di mana pun.
+     Nilai ini juga otomatis benar di mode gelap: --color-ink di sana terang,
+     jadi garisnya menerangkan, bukan menggelapkan. */
+  --color-line: color-mix(in srgb, var(--color-ink) 12%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-ink) 26%, transparent);
+  --color-ink: #111827;
+  --color-ink-soft: #64748b;
+  --color-faint: #94a3b8;
 
-  /* Empat warna Gantt, diambil apa adanya dari lembar Excel DTDI. Harus sama
-     dengan PALETTE_TOKENS di lib/palette.ts — dijaga oleh `npm test` — karena
-     lembar XLSX memakai angka yang sama. */
+  /* Aksen tunggal aplikasi: tab aktif, fokus, tautan, hover tombol baris. */
+  --color-mark: #2563eb;
+  --color-mark-soft: #eff6ff;
+  /* Garis hari ini sengaja BUKAN warna aksen — kalau biru semua, penanda
+     waktu tenggelam di antara bar dan tab yang juga biru. */
+  --color-today: #f97316;
+
+  --color-bar-fill: #2563eb;
+  /* Hijau "selesai" HARUS sekeluarga dengan hijau Gantt dari Excel
+     (#8ed973, hue 104°) — nilai ini diturunkan langsung darinya. Sebelumnya
+     #15803d di hue 142°: di baris yang sama, bar Progress biru-hijau berdiri
+     tepat di sebelah bar Gantt kuning-hijau, dan bedanya 38° terbaca sebagai
+     dua warna yang bertengkar. */
+  --color-done: #4e773f;
+  --color-blocked: #dc2626;
+  /* Biru terpilih dibuat cukup pekat supaya tetap terbaca di atas pita induk,
+     bukan cuma di atas baris putih. Pasangannya garis tepi di --color-mark. */
+  --color-selected: #dbeafe;
+
+  /* Pil status. Latarnya sengaja tetap muda — yang dinaikkan cuma teks dan
+     titiknya, sampai rasio 6,8–8,3 (dulu 3,0–4,3, dan teks Done yang 3,00 itu
+     di bawah ambang baca untuk ukuran 11px). */
+  --color-done-soft: #ddf4d5;
+  --color-done-ink: #39572e;
+  --color-progress-soft: #dbeafe;
+  --color-progress-ink: #1e40af;
+  --color-blocked-soft: #fee2e2;
+  --color-blocked-ink: #991b1b;
+  --color-todo-soft: #f1f5f9;
+  --color-todo-ink: #475569;
+
+  /* Hijau Gantt, diambil apa adanya dari lembar Excel DTDI. Harus sama dengan
+     PALETTE_TOKENS di lib/palette.ts — dijaga oleh `npm test` — karena bar di
+     layar dan bar di lembar XLSX memang harus warna yang sama. */
   --color-bar: #8ed973;
   --color-bar-track: #daf2d0;
-  --color-level-1: #d9d9d9;
-  --color-level-2: #f2f2f2;
+
+  /* Pita baris induk. Ini HANYA untuk layar dan sengaja tidak lagi memakai
+     abu Excel (#d9d9d9 / #f2f2f2): abu netral sepekat itu jadi balok kelabu di
+     tengah palet dingin. Lembar XLSX tetap memakai nilai aslinya — lihat
+     LEVEL_BAND di lib/palette.ts. */
+  --color-row-1: #f1f4f7;
+  --color-row-2: #f8f9fb;
   /* Baris yang baru diubah AI dan belum disimpan. Ungu dipilih karena satu-
      satunya warna yang belum punya arti lain di tabel ini. */
   --color-ai: #f1edfa;
@@ -39,28 +84,38 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-canvas: #141312;
-    --color-surface: #1a1918;
-    --color-raised: #232120;
-    --color-line: #302d2b;
-    --color-line-strong: #46413e;
-    --color-ink: #eae7e3;
-    --color-ink-soft: #a09992;
-    --color-faint: #6d6660;
-    --color-mark: #e0913f;
-    --color-mark-soft: #33261a;
-    --color-bar-fill: #8fb0c9;
-    --color-done: #6f9f72;
-    --color-blocked: #d0705e;
-    --color-selected: #23292f;
+    --color-canvas: #12161c;
+    --color-surface: #151a21;
+    --color-raised: #1f252f;
+    --color-ink: #e6e9ee;
+    --color-ink-soft: #94a3b8;
+    --color-faint: #64748b;
+
+    --color-mark: #60a5fa;
+    --color-mark-soft: #17233a;
+    --color-today: #fb923c;
+
+    --color-bar-fill: #60a5fa;
+    --color-done: #7fbf62;
+    --color-blocked: #f87171;
+    --color-selected: #1e3a5f;
+
+    --color-done-soft: #1c2e15;
+    --color-done-ink: #b7e0a4;
+    --color-progress-soft: #16253d;
+    --color-progress-ink: #bfdbfe;
+    --color-blocked-soft: #351a1a;
+    --color-blocked-ink: #fecaca;
+    --color-todo-soft: #1c222b;
+    --color-todo-ink: #cbd5e1;
 
     /* Padanan gelap: hijau Excel dipertahankan sebagai bagian pekat, tapi
        rentangnya digelapkan — #daf2d0 nyaris putih dan akan menelan teks
        baris di mode ini. */
     --color-bar: #6faf58;
     --color-bar-track: #22301c;
-    --color-level-1: #2a2725;
-    --color-level-2: #201e1d;
+    --color-row-1: #1c222b;
+    --color-row-2: #191e26;
     --color-ai: #262234;
     --color-ai-edge: #9d8ed0;
 
@@ -252,24 +307,28 @@ input.bare {
 }
 
 :root {
-  --background: #faf9f7;
-  --foreground: #1b1a18;
+  --background: #f8fafc;
+  --foreground: #111827;
   --card: #ffffff;
-  --card-foreground: #1b1a18;
+  --card-foreground: #111827;
   --popover: #ffffff;
-  --popover-foreground: #1b1a18;
-  --primary: #b45309;
-  --primary-foreground: #fffaf4;
-  --secondary: #f2efeb;
-  --secondary-foreground: #1b1a18;
-  --muted: #f2efeb;
-  --muted-foreground: #6f6862;
-  --accent: #ece7e1;
-  --accent-foreground: #1b1a18;
-  --destructive: #b0503f;
-  --border: #e4e0da;
-  --input: #e4e0da;
-  --ring: #b45309;
+  --popover-foreground: #111827;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #111827;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #e2e8f0;
+  --accent-foreground: #111827;
+  --destructive: #dc2626;
+  /* Sama seperti --color-line: digelapkan dari apa pun yang ada di bawahnya.
+     Sebagai warna tetap, border tombol dan kotak isian nyaris tak terlihat di
+     atas latar yang sudah muda. Ungkapan ini juga otomatis benar di mode
+     gelap, jadi .dark tidak perlu menimpanya lagi. */
+  --border: color-mix(in srgb, var(--color-ink) 14%, transparent);
+  --input: color-mix(in srgb, var(--color-ink) 14%, transparent);
+  --ring: #2563eb;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
@@ -287,24 +346,22 @@ input.bare {
 }
 
 .dark {
-  --background: #141312;
-  --foreground: #eae7e3;
-  --card: #1a1918;
-  --card-foreground: #eae7e3;
-  --popover: #1f1e1c;
-  --popover-foreground: #eae7e3;
-  --primary: #e0913f;
-  --primary-foreground: #1a1310;
-  --secondary: #232120;
-  --secondary-foreground: #eae7e3;
-  --muted: #232120;
-  --muted-foreground: #a09992;
-  --accent: #2c2927;
-  --accent-foreground: #eae7e3;
-  --destructive: #d0705e;
-  --border: #302d2b;
-  --input: #37332f;
-  --ring: #e0913f;
+  --background: #0f1319;
+  --foreground: #e6e9ee;
+  --card: #151a21;
+  --card-foreground: #e6e9ee;
+  --popover: #1c222b;
+  --popover-foreground: #e6e9ee;
+  --primary: #60a5fa;
+  --primary-foreground: #0b1220;
+  --secondary: #1c222b;
+  --secondary-foreground: #e6e9ee;
+  --muted: #1c222b;
+  --muted-foreground: #94a3b8;
+  --accent: #262d37;
+  --accent-foreground: #e6e9ee;
+  --destructive: #f87171;
+  --ring: #60a5fa;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);

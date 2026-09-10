@@ -51,7 +51,7 @@ dari anak-anaknya.
 | G2 | Pecah pekerjaan besar jadi sub-pekerjaan tanpa berpindah layar | Buat anak task cukup satu tombol indent |
 | G3 | Tambah & edit task secepat mengetik di spreadsheet | Task baru selesai dibuat < 10 detik, tanpa modal wajib |
 | G4 | Tahu apa yang telat dan apa yang mendekati deadline | Task lewat `end` dan progres < 100% ditandai otomatis |
-| G5 | Struktur tidak pernah rusak karena sorting | Sorting apa pun tetap mempertahankan hubungan induk–anak |
+| G5 | Urutan baris sepenuhnya milik pengguna | Susunan hanya berubah kalau kamu sendiri yang memindahkannya |
 | G6 | Data aman & portabel | Bisa export/import penuh termasuk hierarki; data tidak hilang saat restart |
 
 ### Non-Tujuan (eksplisit TIDAK dibuat)
@@ -278,24 +278,21 @@ Aturan drag & drop:
 - Indent otomatis mengaktifkan `rollup` pada induk baru bila induk itu belum
   punya anak sebelumnya.
 
-### 5.3 Sorting (P0 — inti)
+### 5.3 Urutan baris (P0 — inti)
 
-Sorting **tidak pernah meratakan pohon**. Klik header kolom (Task, Progress,
-Start, End, Status, Priority) mengurutkan **saudara sekandung di dalam
-induknya masing-masing**, secara rekursif. Blok `1.x` tetap berada di bawah `1`.
+**Tidak ada pengurutan per kolom.** Urutan baris hanya satu: `order` di antara
+saudara sekandung, dan hanya berubah kalau kamu sendiri yang memindahkannya —
+drag nomor WBS, indent/outdent, atau `⌘↑`/`⌘↓`.
 
-Dua mode, di-toggle dari header tabel:
+Fitur sorting per kolom sempat ada (mode Manual/Terurut + tombol "jadikan
+urutan manual") lalu **dibuang**. Alasannya: di tabel WBS, nomor `1.2.1` adalah
+alamat, bukan sekadar label urutan. Begitu tabel diurutkan ulang menurut kolom
+lain, nomor itu ikut berganti dan alamat yang tadi kamu sebut jadi menunjuk
+baris yang berbeda. Dua mode urutan juga berarti dua kebenaran tentang "baris
+ke berapa" yang harus dijaga selaras di tabel, timeline, kalender, dan export.
 
-| Mode | Perilaku |
-|------|----------|
-| **Manual** (default) | Urutan mengikuti `order` hasil drag. Header sorting mati |
-| **Terurut** | Urutan tampilan mengikuti kolom yang dipilih; `order` tersimpan **tidak diubah**. Nomor WBS ikut menyesuaikan tampilan |
-
-Di mode Terurut tersedia tombol **"Jadikan urutan manual"** yang menulis urutan
-hasil sort ke `order` secara permanen, lalu kembali ke mode Manual. Tanpa itu,
-mematikan sorting mengembalikan susunan drag semula.
-
-Sorting sekunder: klik header kedua sambil `Shift`.
+Untuk melihat sebagian baris saja, pakai **filter** (§5.6) — itu menyembunyikan
+baris tanpa menyentuh susunannya.
 
 ### 5.4 Timeline / Date Range (P0 — inti)
 
@@ -617,7 +614,7 @@ components/
   Timeline/               → grid tanggal, bar daun, bar ringkasan induk
     Bar.tsx               → badan + dua handle resize, zona hit-area
     useBarDrag.ts         → drag/resize: snapping, pratinjau, Esc, auto-scroll
-  Toolbar/                → filter, sorting, zoom, pencarian, ringkasan
+  Toolbar/                → filter, zoom, pencarian, ringkasan, simpan/buang
 lib/
   bridge.ts               → akses halaman ke window.zeno (satu-satunya jalan)
   sync.ts                 → creates → patches → deletes, urutannya mengikat
@@ -630,9 +627,8 @@ lib/
   schedule.ts             → pxToDate/dateToPx, snapping, geser sub-pohon,
                             clamp durasi minimum
   dates.ts                → parsing input tanggal ("besok", "+3d")
-  sort.ts                 → sorting per tingkat yang mempertahankan hierarki
 scripts/
-  check-tree.ts           → pemeriksaan pohon, roll-up, sorting, filter
+  check-tree.ts           → pemeriksaan pohon, roll-up, filter
   smoke-desktop.ts        → uji asap Renderer → IPC → Main pada app sungguhan
 docs/
   PRD.md
@@ -677,7 +673,6 @@ atau DB — keduanya bagian paling rawan bug dan harus punya unit test sendiri.
 - Geser induk ber-roll-up memindahkan seluruh sub-pohon.
 
 ### v0.3 — Kerja sehari-hari (P1)
-- Sorting per tingkat (mode Manual/Terurut) + "jadikan urutan manual".
 - Status & priority, filter hierarkis, pencarian.
 - Drag banyak baris sekaligus; pintasan keyboard `Alt+←/→` untuk menggeser
   jadwal tanpa mouse.
@@ -703,7 +698,6 @@ atau DB — keduanya bagian paling rawan bug dan harus punya unit test sendiri.
 | Risiko | Dampak | Mitigasi |
 |--------|--------|----------|
 | Logika pohon (indent/outdent/move) rawan bug halus | Data berantakan, siklus, baris yatim | `lib/tree.ts` fungsi murni + unit test menyeluruh sebelum dipakai UI |
-| Sorting merusak hierarki | Kepercayaan ke app hilang | Sorting hanya di dalam saudara sekandung; mode Terurut tidak menulis `order` |
 | Roll-up bertabrakan dengan input manual | User bingung kenapa angkanya berubah sendiri | Sel roll-up read-only + redup + tooltip; ada jalan keluar eksplisit (`rollup = false`) |
 | Timeline + pohon dalam = layar terlalu ramai | Sulit dibaca | Collapse default untuk pohon > 3 tingkat; bar ringkasan lebih tipis dari bar daun |
 | Drag tidak sengaja mengubah jadwal | Tanggal berubah tanpa disadari | Ambang gerak 4px sebelum drag dianggap mulai; `Esc` membatalkan; satu drag = satu langkah undo |
@@ -743,7 +737,6 @@ Aplikasi dianggap selesai untuk pemakaian harian bila:
 - [ ] Memindahkan induk memindahkan seluruh sub-pohonnya, dan tidak pernah bisa
       menghasilkan siklus.
 - [ ] Progres dan tanggal induk terhitung otomatis dari anak-anaknya.
-- [ ] Sorting lewat header tidak pernah merusak hubungan induk–anak.
 - [ ] Bar timeline akurat mencerminkan rentang dan progres, termasuk bar
       ringkasan induk.
 - [ ] Jadwal bisa diatur dari dua arah: mengetik di kolom Start/End menggeser

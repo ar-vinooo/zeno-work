@@ -155,7 +155,7 @@ export function applyPatches(patches: Patch[]): void {
   inTransaction(db, () => {
     for (const patch of patches) {
       // createdAt & updatedAt tidak pernah diambil dari klien: updatedAt
-      // selalu ditulis server, dan duplikat kolom di SET harus dihindari.
+      // selalu ditulis proses utama, dan duplikat kolom di SET harus dihindari.
       const fields = COLUMNS.filter(
         (c) => c in patch && c !== "createdAt" && c !== "updatedAt",
       );

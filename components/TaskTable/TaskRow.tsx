@@ -35,11 +35,34 @@ interface Props {
   onBarDrag: (event: React.PointerEvent, id: string, mode: DragMode) => void;
 }
 
-const STATUS_DOT: Record<Status, string> = {
-  todo: "var(--color-faint)",
-  in_progress: "var(--color-bar-fill)",
-  blocked: "var(--color-blocked)",
-  done: "var(--color-done)",
+/**
+ * Status digambar sebagai pil berwarna, bukan teks polos: dalam tabel sepadat
+ * ini warna terbaca lebih dulu daripada kata, jadi "mana yang belum jalan"
+ * terjawab tanpa membaca satu kolom pun.
+ */
+const STATUS_PILL: Record<Status, { bg: string; fg: string; dot: string }> = {
+  // `dot` dipakai dua tempat: di dalam pil, dan di kolom Task yang latarnya
+  // warna baris — jadi titiknya memakai warna pekat, bukan warna teks pil.
+  todo: {
+    bg: "var(--color-todo-soft)",
+    fg: "var(--color-todo-ink)",
+    dot: "var(--color-ink-soft)",
+  },
+  in_progress: {
+    bg: "var(--color-progress-soft)",
+    fg: "var(--color-progress-ink)",
+    dot: "var(--color-bar-fill)",
+  },
+  blocked: {
+    bg: "var(--color-blocked-soft)",
+    fg: "var(--color-blocked-ink)",
+    dot: "var(--color-blocked)",
+  },
+  done: {
+    bg: "var(--color-done-soft)",
+    fg: "var(--color-done-ink)",
+    dot: "var(--color-done)",
+  },
 };
 
 function TaskRow({
@@ -79,14 +102,19 @@ function TaskRow({
   // timeline digeser mendatar.
   // Urutan: pilihan menang atas tanda AI, tanda AI menang atas warna tingkat.
   // Baris yang baru diubah AI memang harus menonjol sampai kamu menyimpannya.
+  //
+  // Latar saja tidak cukup. Kedalaman, baris terpilih, dan tanda AI adalah tiga
+  // hal berbeda; kalau ketiganya cuma diberi beda tingkat terang, semuanya
+  // berdesakan dalam rentang beberapa persen dan tak ada yang terbaca. Jadi
+  // terpilih dan tanda AI mendapat saluran keduanya sendiri: garis tepi kiri.
   const background = selected
     ? "var(--color-selected)"
     : aiEdited
       ? "var(--color-ai)"
       : row.depth === 0
-        ? "var(--color-level-1)"
+        ? "var(--color-row-1)"
         : row.depth === 1
-          ? "var(--color-level-2)"
+          ? "var(--color-row-2)"
           : "var(--color-surface)";
   const todayX = xForDate(scale, today);
 
@@ -108,9 +136,11 @@ function TaskRow({
         style={{
           width: "var(--col-left)",
           background,
-          boxShadow: aiEdited
-            ? "inset 3px 0 0 0 var(--color-ai-edge)"
-            : undefined,
+          boxShadow: selected
+            ? "inset 3px 0 0 0 var(--color-mark)"
+            : aiEdited
+              ? "inset 3px 0 0 0 var(--color-ai-edge)"
+              : undefined,
         }}
         title={aiEdited ? "Diubah asisten AI, belum disimpan" : undefined}
       >
@@ -195,7 +225,7 @@ function TaskRow({
           >
             <span
               className="h-1.5 w-1.5 shrink-0 rounded-full"
-              style={{ background: STATUS_DOT[display.status] }}
+              style={{ background: STATUS_PILL[display.status].dot }}
             />
             <Editable
               value={task.title}
@@ -253,29 +283,43 @@ function TaskRow({
           className="cell shrink-0 border-l border-[var(--color-line)]"
           style={{ width: widthOf("status") }}
         >
-          {readOnly ? (
+          {/* Pil memeluk teksnya, dan select-nya ditumpangkan transparan di
+              atasnya. Kalau select-nya yang digambar langsung, lebarnya
+              mengikuti opsi terpanjang ("Blocked") sehingga semua pil ikut
+              melebar seukuran kolom. */}
+          <span
+            className="relative inline-flex max-w-full items-center gap-1 rounded-full px-1.5 py-[2px]"
+            style={{
+              background: STATUS_PILL[display.status].bg,
+              color: STATUS_PILL[display.status].fg,
+            }}
+            title={readOnly ? "Dihitung dari sub-task" : undefined}
+          >
             <span
-              className="text-[11px] text-[var(--color-faint)]"
-              title="Dihitung dari sub-task"
-            >
+              className="size-1.5 shrink-0 rounded-full"
+              style={{ background: STATUS_PILL[display.status].dot }}
+            />
+            <span className="truncate text-[11px]">
               {STATUS_LABEL[display.status]}
             </span>
-          ) : (
-            <select
-              className="bare cursor-pointer text-[11px]"
-              value={task.status}
-              onChange={(e) =>
-                patchTask(task.id, { status: e.target.value as Status })
-              }
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
-                <option key={s} value={s}>
-                  {STATUS_LABEL[s]}
-                </option>
-              ))}
-            </select>
-          )}
+            {!readOnly && (
+              <select
+                className="absolute inset-0 cursor-pointer opacity-0"
+                value={task.status}
+                aria-label="Status"
+                onChange={(e) =>
+                  patchTask(task.id, { status: e.target.value as Status })
+                }
+                onMouseDown={(e) => e.stopPropagation()}
+              >
+                {(Object.keys(STATUS_LABEL) as Status[]).map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABEL[s]}
+                  </option>
+                ))}
+              </select>
+            )}
+          </span>
         </div>
 
         {/* Start & End */}
@@ -332,7 +376,7 @@ function TaskRow({
       >
         <div
           className="pointer-events-none absolute inset-y-0 w-px"
-          style={{ left: todayX, background: "var(--color-mark)", opacity: 0.7 }}
+          style={{ left: todayX, background: "var(--color-today)", opacity: 0.8 }}
         />
         <Bar
           row={row}

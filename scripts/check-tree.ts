@@ -30,9 +30,8 @@ function check(label: string, actual: unknown, expected: unknown) {
   console.log(`${ok ? "ok  " : "FAIL"}  ${label}${ok ? "" : `\n        harap ${b}\n        dapat ${a}`}`);
 }
 
-const MANUAL = { column: "manual", dir: "asc" } as const;
 const outlineOf = (tasks: Task[]) =>
-  buildOutline(tasks, MANUAL).all.map((n) => `${n.wbs} ${n.task.title}`);
+  buildOutline(tasks).all.map((n) => `${n.wbs} ${n.task.title}`);
 
 // Susunan awal: 1 A (1.1 A1, 1.2 A2), 2 B, 3 C
 const mk = (title: string, parentId: string | null, order: number, start: string, end: string) =>
@@ -50,7 +49,7 @@ check("penomoran awal", outlineOf(tasks), ["1 A", "1.1 A1", "1.2 A2", "2 B", "3 
 // Roll-up: A dihitung dari A1 (4 hari, 0%) dan A2 (2 hari, 0%)
 A1.progress = 100;
 tasks = applyPatchList(tasks, [{ id: A1.id, progress: 100, status: "done" }]);
-const rolled = buildOutline(tasks, MANUAL).byId.get(A.id)!;
+const rolled = buildOutline(tasks).byId.get(A.id)!;
 check("roll-up rentang induk", [rolled.eff.start, rolled.eff.end], ["2026-01-01", "2026-01-06"]);
 check("roll-up progres berbobot durasi (4h×100 + 2h×0)/6", rolled.eff.progress, 67);
 check("roll-up status campuran", rolled.eff.status, "in_progress");
@@ -78,7 +77,7 @@ check("pindah C ke atas", outlineOf(tasks), ["1 C", "2 A", "2.1 A1", "2.2 A2", "
 
 // Geser sub-pohon A tiga hari
 tasks = applyPatchList(tasks, shiftSubtree(tasks, A.id, 3));
-const shifted = buildOutline(tasks, MANUAL).byId.get(A.id)!;
+const shifted = buildOutline(tasks).byId.get(A.id)!;
 check("geser sub-pohon menggeser semua anak", [shifted.eff.start, shifted.eff.end], ["2026-01-04", "2026-01-09"]);
 
 // Hapus induk dengan menaikkan anak
@@ -93,14 +92,8 @@ check("promote menaikkan anak", outlineOf(afterPromote), ["1 C", "2 A1", "3 A2",
 const cascade = removeTask(tasks, A.id, "cascade");
 check("cascade menghapus sub-pohon", cascade.removeIds.length, 3);
 
-// Sorting tidak pernah meratakan hierarki
-const sorted = buildOutline(tasks, { column: "title", dir: "desc" }).all.map(
-  (n) => `${n.wbs} ${n.task.title}`,
-);
-check("sorting menjaga induk-anak", sorted, ["1 C", "2 B", "3 A", "3.1 A2", "3.2 A1"]);
-
 // Filter menampilkan leluhur sebagai konteks
-const filtered = computeRows(tasks, MANUAL, { ...EMPTY_FILTERS, query: "A2" });
+const filtered = computeRows(tasks, { ...EMPTY_FILTERS, query: "A2" });
 check(
   "filter menyertakan leluhur sebagai konteks",
   filtered.rows.map((r) => `${r.wbs}${r.contextOnly ? "*" : ""}`),
@@ -116,7 +109,7 @@ check(
 const collapsed = applyPatchList(tasks, [{ id: A.id, collapsed: true }]);
 check(
   "collapse menyembunyikan anak",
-  computeRows(collapsed, MANUAL, EMPTY_FILTERS).rows.map((r) => r.wbs),
+  computeRows(collapsed, EMPTY_FILTERS).rows.map((r) => r.wbs),
   ["1", "2", "3"],
 );
 

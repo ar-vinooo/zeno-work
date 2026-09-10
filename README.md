@@ -25,7 +25,7 @@ macOS atau `%APPDATA%\\ZenoWork\\data` di Windows), sehingga upgrade aplikasi
 tidak menimpa data pekerjaan.
 
 ```bash
-npm test             # logika pohon, roll-up, sorting, filter
+npm test             # logika pohon, roll-up, filter
 npm run test:desktop # uji asap Renderer → IPC → Main pada aplikasi sungguhan
 npm run typecheck    # halaman dan proses utama, dua-duanya
 ```
@@ -123,8 +123,8 @@ tidak ikut diekspor, sehingga harus diatur kembali di perangkat baru.
 - **Drag jadwal**: badan bar menggeser tanggal (durasi tetap), ujung bar
   mengubah durasi. Kolom Start/End ikut berubah real-time. `Esc` membatalkan.
   Menggeser bar induk memindahkan seluruh sub-pohonnya.
-- Sorting per tingkat yang tidak pernah merusak hierarki, dengan mode
-  Manual / Terurut dan tombol "jadikan urutan manual".
+- Urutan baris **hanya manual** — diatur lewat drag, indent/outdent, dan
+  `⌘↑`/`⌘↓`. Tidak ada pengurutan per kolom.
 - Filter dengan leluhur tetap tampil sebagai konteks.
 - Undo/redo (satu drag = satu langkah). Export JSON/CSV/Markdown/XLSX dan
   import JSON, semuanya lewat dialog simpan bawaan sistem.

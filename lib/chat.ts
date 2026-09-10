@@ -60,7 +60,7 @@ function reasoningParams(model: string, effort: string) {
 
 /** Ringkasan pohon yang dikirim ke model — satu baris per task. */
 function outlineText(): string {
-  const outline = buildOutline(listTasks(), { column: "manual", dir: "asc" });
+  const outline = buildOutline(listTasks());
   const today = todayISO();
 
   // Daftar isi tingkat 1 ditaruh di depan. Modelnya memang bisa menyimpulkan
