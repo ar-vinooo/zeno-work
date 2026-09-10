@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import { zeno } from "@/lib/bridge";
+import { useShortcutText } from "@/lib/shortcuts";
 import { useStore } from "@/lib/store";
 import type { AiOperation } from "@/lib/ai";
 import type { ChatMessage } from "@/lib/chat";
@@ -36,6 +37,8 @@ export default function ChatPanel() {
   const open = useStore((s) => s.chatOpen);
   const toggleChat = useStore((s) => s.toggleChat);
   const applyAiOperations = useStore((s) => s.applyAiOperations);
+  const shortcut = useShortcutText();
+  const lineBreakShortcut = shortcut(["shift", "Enter"]);
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
@@ -243,7 +246,7 @@ export default function ChatPanel() {
           rows={2}
           value={draft}
           disabled={busy}
-          placeholder="Tulis perintah… (Enter kirim, ⇧Enter baris baru)"
+          placeholder={`Tulis perintah… (Enter kirim, ${lineBreakShortcut} baris baru)`}
           className="flex-1 resize-none rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1.5 text-[12px] outline-none focus:border-[var(--color-mark)]"
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {

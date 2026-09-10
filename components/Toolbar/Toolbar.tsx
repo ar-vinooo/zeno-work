@@ -55,6 +55,7 @@ import { zeno } from "@/lib/bridge";
 import { useStore } from "@/lib/store";
 import { buildOutline } from "@/lib/rollup";
 import { durationOf, todayISO } from "@/lib/dates";
+import { useShortcutText } from "@/lib/shortcuts";
 import {
   RANGE_LABEL,
   PRIORITY_LABEL,
@@ -133,6 +134,12 @@ export default function Toolbar({
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const shortcut = useShortcutText();
+  const saveShortcut = shortcut(["mod", "S"]);
+  const undoShortcut = shortcut(["mod", "Z"]);
+  const redoShortcut = shortcut(["shift", "mod", "Z"]);
+  const collapseShortcut = shortcut(["shift", "mod", "["]);
+  const expandShortcut = shortcut(["shift", "mod", "]"]);
 
   // Filter tidak boleh menjadi keadaan tersembunyi di dalam dropdown. Saat
   // hasil tabel berubah, ringkasan ini tetap terlihat di toolbar agar jelas
@@ -427,7 +434,7 @@ export default function Toolbar({
           {pending > 0 ? (
             <>
               {/* Jalan keluar kalau suntingannya sudah telanjur jauh. Tetap
-                  lewat konfirmasi, dan tetap bisa dibatalkan dengan ⌘Z. */}
+                  lewat konfirmasi, dan tetap bisa dibatalkan dengan shortcut undo. */}
               <Button
                 variant="ghost"
                 size="sm"
@@ -447,7 +454,7 @@ export default function Toolbar({
               >
                 <Save className="size-3.5" />
                 {saving > 0 ? "Menyimpan…" : `Simpan ${pending}`}
-                <span className="opacity-60">⌘S</span>
+                <span className="opacity-60">{saveShortcut}</span>
               </Button>
             </>
           ) : (
@@ -456,17 +463,17 @@ export default function Toolbar({
             </span>
           )}
 
-          {iconButton("Undo (⌘Z)", <Undo2 className="size-3.5" />, undo, !canUndo)}
-          {iconButton("Redo (⇧⌘Z)", <Redo2 className="size-3.5" />, redo, !canRedo)}
+          {iconButton(`Undo (${undoShortcut})`, <Undo2 className="size-3.5" />, undo, !canUndo)}
+          {iconButton(`Redo (${redoShortcut})`, <Redo2 className="size-3.5" />, redo, !canRedo)}
           {view === "table" && (
             <>
               {iconButton(
-                "Tutup semua (⇧⌘[)",
+                `Tutup semua (${collapseShortcut})`,
                 <ChevronsDownUp className="size-3.5" />,
                 () => setAllCollapsed(true),
               )}
               {iconButton(
-                "Buka semua (⇧⌘])",
+                `Buka semua (${expandShortcut})`,
                 <ChevronsUpDown className="size-3.5" />,
                 () => setAllCollapsed(false),
               )}
@@ -568,7 +575,7 @@ export default function Toolbar({
             </AlertDialogTitle>
             <AlertDialogDescription>
               Tabel kembali ke kondisi terakhir yang tersimpan di database.
-              Bisa dibatalkan dengan ⌘Z selama aplikasi belum ditutup.
+              Bisa dibatalkan dengan {undoShortcut} selama aplikasi belum ditutup.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:flex-wrap">

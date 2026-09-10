@@ -21,6 +21,7 @@ import { diffDays, maxISO, minISO, shiftISO, todayISO, weekStartISO } from "@/li
 import { zeno } from "@/lib/bridge";
 import { computeRows } from "@/lib/rows";
 import { makeScale, xForDate } from "@/lib/schedule";
+import { useShortcutText } from "@/lib/shortcuts";
 import { useStore } from "@/lib/store";
 import { childrenOf, subtreeIds, topMost } from "@/lib/tree";
 
@@ -43,6 +44,8 @@ export default function App() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [view, setView] = useState<WorkspaceView>("table");
   const [calendarTodayToken, setCalendarTodayToken] = useState(0);
+  const shortcut = useShortcutText();
+  const undoShortcut = shortcut(["mod", "Z"]);
 
   // Muatan pertama dari proses utama. Sampai ini selesai tabelnya belum
   // digambar sama sekali — lebih baik daripada memperlihatkan tabel kosong
@@ -355,8 +358,8 @@ export default function App() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deleteTarget.hasChildren
-                ? `${deleteTarget.descendants} sub-task di bawahnya ikut terhapus. Bisa dibatalkan dengan ⌘Z.`
-                : "Bisa dibatalkan dengan ⌘Z."}
+                ? `${deleteTarget.descendants} sub-task di bawahnya ikut terhapus. Bisa dibatalkan dengan ${undoShortcut}.`
+                : `Bisa dibatalkan dengan ${undoShortcut}.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="sm:flex-wrap">
