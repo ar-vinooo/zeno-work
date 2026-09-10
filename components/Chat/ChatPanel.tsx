@@ -36,6 +36,7 @@ export default function ChatPanel() {
   const open = useStore((s) => s.chatOpen);
   const toggleChat = useStore((s) => s.toggleChat);
   const applyAiOperations = useStore((s) => s.applyAiOperations);
+  const tasks = useStore((s) => s.tasks);
 
   const [turns, setTurns] = useState<Turn[]>([]);
   const [draft, setDraft] = useState("");
@@ -117,7 +118,7 @@ export default function ChatPanel() {
     setTurns((prev) => [...prev, { role: "user", text }]);
 
     try {
-      const data = await zeno().chat.send(history);
+      const data = await zeno().chat.send(history, tasks);
 
       const applied = data.operations?.length
         ? applyAiOperations(data.operations)

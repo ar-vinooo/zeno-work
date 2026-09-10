@@ -125,5 +125,7 @@ export function registerIpc(): void {
     ),
   );
 
-  handle("chat:send", (messages: ChatMessage[]) => runChat(messages ?? []));
+  handle("chat:send", (messages: ChatMessage[], tasks: unknown) =>
+    runChat(messages ?? [], tasks),
+  );
 }

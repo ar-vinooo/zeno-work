@@ -72,6 +72,6 @@ export interface ZenoApi {
     text(fileName: string, content: string): Promise<SaveResult>;
   };
   chat: {
-    send(messages: ChatMessage[]): Promise<ChatReply>;
+    send(messages: ChatMessage[], tasks: Task[]): Promise<ChatReply>;
   };
 }

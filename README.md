@@ -58,6 +58,14 @@ dipakai.
 | `chat:send` | Asisten AI — kunci API dan CLI hanya tersentuh di proses utama |
 | `repository:choose` | Pilih folder Git lokal untuk konteks AI read-only |
 
+Chat mengirim snapshot task yang sedang tampil di editor, termasuk perubahan
+yang belum disimpan. AI memakai snapshot itu untuk membaca, mencari, dan
+menyusun usulan; database tetap hanya berubah lewat `tasks:sync` saat pengguna
+menekan **Simpan**.
+Mode API hanya diberi peta awal tingkat 1 lalu menelusuri detail dengan
+`tree_search`, `find_tasks`, dan `get_subtree`; mode CLI tetap menerima outline
+lengkap karena belum punya tool-call interaktif.
+
 ### Repository sebagai sumber task AI
 
 Pada setiap baris task, klik ikon Git untuk memilih repository. Ikon yang aktif

@@ -37,7 +37,7 @@ const api: ZenoApi = {
     text: (fileName, content) => invoke("export:text", fileName, content),
   },
   chat: {
-    send: (messages) => invoke("chat:send", messages),
+    send: (messages, tasks) => invoke("chat:send", messages, tasks),
   },
 };
 

@@ -4,6 +4,7 @@ import { create } from "zustand";
 import {
   applyPatchList,
   childrenOf,
+  depthOf,
   indent,
   indexById,
   insertChild,
@@ -102,6 +103,53 @@ function restoreCollapsed(tasks: Task[]): Task[] {
 
 const countDiff = (d: Diff) =>
   d.creates.length + d.patches.length + d.deleteIds.length;
+
+function summarizeTaskDiff(prev: Task[], next: Task[], touched: string[]): string[] {
+  const diff = diffTasks(prev, next);
+  const before = buildOutline(prev);
+  const after = buildOutline(next);
+  const touchedIds = new Set(touched);
+  const lines: string[] = [];
+  const fmt = (task: Task) =>
+    `${task.title} (${task.start}..${task.end}, ${task.progress}%, ${task.status})`;
+
+  for (const task of diff.creates) {
+    const node = after.byId.get(task.id);
+    lines.push(`+ ${node?.wbs ?? "?"} ${fmt(task)}`);
+  }
+
+  for (const id of diff.deleteIds) {
+    const node = before.byId.get(id);
+    if (node) lines.push(`- ${node.wbs} ${node.task.title}`);
+  }
+
+  const beforeById = indexById(prev);
+  const afterById = indexById(next);
+  const fields: (keyof Task)[] = ["title", "start", "end", "progress", "status"];
+  for (const patch of diff.patches) {
+    const old = beforeById.get(patch.id);
+    const current = afterById.get(patch.id);
+    if (!old || !current) continue;
+
+    const oldNode = before.byId.get(patch.id);
+    const currentNode = after.byId.get(patch.id);
+    const moved =
+      touchedIds.has(patch.id) &&
+      (old.parentId !== current.parentId || old.order !== current.order);
+    if (moved)
+      lines.push(
+        `↕ ${oldNode?.wbs ?? "?"} → ${currentNode?.wbs ?? "?"} ${current.title}`,
+      );
+
+    const changed = fields
+      .filter((field) => old[field] !== current[field])
+      .map((field) => `${field}: ${String(old[field])} → ${String(current[field])}`);
+    if (changed.length)
+      lines.push(`~ ${currentNode?.wbs ?? oldNode?.wbs ?? "?"} ${changed.join(", ")}`);
+  }
+
+  return lines.slice(0, 80);
+}
 
 export type DragMode = "move" | "start" | "end";
 
@@ -480,6 +528,7 @@ export const useStore = create<Store>((set, get) => {
 
     applyAiOperations: (ops) => {
       let tasks = get().tasks;
+      const original = tasks;
       // Nomor WBS dipetakan SEKALI di awal: model menyusun usulannya
       // berdasarkan keadaan yang dia lihat, dan nomor bergeser begitu ada
       // baris yang ditambah atau dihapus. Baris baru tidak butuh nomor karena
@@ -495,6 +544,10 @@ export const useStore = create<Store>((set, get) => {
       // dibuang, bukan dipaksa masuk.
       const ISO = /^\d{4}-\d{2}-\d{2}$/;
       const STATUSES = new Set(["todo", "in_progress", "blocked", "done"]);
+      const maxDepthOk = (candidate: Task[]) =>
+        buildOutline(candidate).all.every((node) => node.depth <= 2);
+      const fitsAsChildOf = (parentId: string | null) =>
+        parentId === null || depthOf(tasks, parentId) < 2;
       const fieldsOf = (op: Record<string, unknown>) => {
         const out: Record<string, unknown> = {};
         if (typeof op.title === "string" && op.title.trim())
@@ -521,6 +574,10 @@ export const useStore = create<Store>((set, get) => {
         parentId: string | null,
         afterId: string | null,
       ) => {
+        if (!fitsAsChildOf(parentId)) {
+          log.push("? kedalaman maksimal 3 tingkat — penambahan dilewati");
+          return;
+        }
         let cursor = afterId;
         for (const node of nodes) {
           if (budget <= 0) break;
@@ -564,6 +621,101 @@ export const useStore = create<Store>((set, get) => {
           continue;
         }
 
+        if (op.op === "move_tasks") {
+          for (const move of Array.isArray(op.moves) ? op.moves : []) {
+            const id = idOf.get(move?.wbs);
+            if (!id) {
+              log.push(`? baris ${move?.wbs} tidak ditemukan — dilewati`);
+              continue;
+            }
+
+            const map = indexById(tasks);
+            let parentId: string | null | undefined;
+            let index: number | undefined;
+
+            if (move.after_wbs || move.before_wbs) {
+              const refWbs = move.after_wbs ?? move.before_wbs!;
+              const refId = idOf.get(refWbs);
+              const ref = refId ? map.get(refId) : undefined;
+              if (!ref) {
+                log.push(`? acuan ${refWbs} tidak ditemukan — ${move.wbs} dilewati`);
+                continue;
+              }
+              parentId = ref.parentId;
+              index = ref.order + (move.after_wbs ? 1 : 0);
+            } else if (move.parent_wbs) {
+              parentId = idOf.get(move.parent_wbs);
+              if (!parentId || !map.has(parentId)) {
+                log.push(`? induk ${move.parent_wbs} tidak ditemukan — ${move.wbs} dilewati`);
+                continue;
+              }
+              index =
+                move.position === "first" ? 0 : childrenOf(tasks, parentId).length;
+            } else {
+              log.push(`? tujuan pindah ${move.wbs} belum jelas — dilewati`);
+              continue;
+            }
+
+            const patches = moveTo(tasks, id, parentId, index);
+            if (patches.length === 0) {
+              log.push(`? ${move.wbs} tidak berubah`);
+              continue;
+            }
+            const candidate = applyPatchList(tasks, patches);
+            if (!maxDepthOk(candidate)) {
+              log.push(`? ${move.wbs} melewati kedalaman maksimal — dilewati`);
+              continue;
+            }
+            tasks = candidate;
+            touched.push(id);
+          }
+          continue;
+        }
+
+        if (op.op === "indent_tasks" || op.op === "outdent_tasks") {
+          for (const wbs of Array.isArray(op.wbs) ? op.wbs : []) {
+            const id = idOf.get(wbs);
+            if (!id) {
+              log.push(`? baris ${wbs} tidak ditemukan — dilewati`);
+              continue;
+            }
+            const patches =
+              op.op === "indent_tasks" ? indent(tasks, id) : outdent(tasks, id);
+            if (patches.length === 0) {
+              log.push(`? ${wbs} tidak berubah`);
+              continue;
+            }
+            const candidate = applyPatchList(tasks, patches);
+            if (!maxDepthOk(candidate)) {
+              log.push(`? ${wbs} melewati kedalaman maksimal — dilewati`);
+              continue;
+            }
+            tasks = candidate;
+            touched.push(id);
+          }
+          continue;
+        }
+
+        if (op.op === "split_tasks") {
+          for (const split of Array.isArray(op.splits) ? op.splits : []) {
+            const id = idOf.get(split?.wbs);
+            if (!id) {
+              log.push(`? baris ${split?.wbs} tidak ditemukan — dilewati`);
+              continue;
+            }
+            if (!Array.isArray(split.tasks) || split.tasks.length === 0) continue;
+            if (!fitsAsChildOf(id)) {
+              log.push(`? ${split.wbs} sudah tingkat terdalam — tidak bisa dipecah`);
+              continue;
+            }
+            const before = touched.length;
+            addTree(split.tasks, id, null);
+            const added = touched.length - before;
+            if (added) log.push(`÷ ${split.wbs} jadi ${added} sub-task`);
+          }
+          continue;
+        }
+
         if (op.op === "delete_tasks") {
           for (const wbs of Array.isArray(op.wbs) ? op.wbs : []) {
             const id = idOf.get(wbs);
@@ -604,7 +756,9 @@ export const useStore = create<Store>((set, get) => {
 
       commit(tasks);
       set((s) => ({ aiTouched: [...new Set([...s.aiTouched, ...touched])] }));
-      return log;
+      const diff = summarizeTaskDiff(original, tasks, touched);
+      const warnings = log.filter((line) => line.startsWith("?"));
+      return diff.length ? [...diff, ...warnings].slice(0, 80) : log;
     },
 
     undo: () => {

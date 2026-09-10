@@ -20,6 +20,8 @@ import {
 import { buildOutline } from "./rollup";
 import { STATUS_LABEL } from "./types";
 import { inspectRepository } from "./repository";
+import { isTask } from "./validate";
+import type { Task } from "./types";
 
 /**
  * Asisten AI. Berjalan di proses utama Electron, bukan di renderer: kunci API
@@ -63,15 +65,32 @@ function reasoningParams(model: string, effort: string) {
   };
 }
 
-/** Ringkasan pohon yang dikirim ke model — satu baris per task. */
-function outlineText(): string {
-  const outline = buildOutline(listTasks());
-  const today = todayISO();
+function chatTasks(snapshot?: unknown): Task[] {
+  if (!Array.isArray(snapshot)) return listTasks();
+  return snapshot.filter(isTask);
+}
 
-  // Daftar isi tingkat 1 ditaruh di depan. Modelnya memang bisa menyimpulkan
-  // ini sendiri dari 290 baris di bawah, tapi pertanyaan "task ini masuk ke
-  // bagian mana" jadi jauh lebih murah dan lebih tepat kalau peta besarnya
-  // sudah terbaca lebih dulu.
+/** Peta awal yang ringan. Detailnya dibuka model lewat tree_search/find_tasks. */
+function initialTreeText(tasks: Task[]): string {
+  const outline = buildOutline(tasks);
+  const sections = outline.roots
+    .map((n) => {
+      const subs = n.children.length;
+      return `${n.wbs}. ${n.task.title} — ${subs ? `${subs} sub-bagian` : "tanpa sub-task"}, ${n.eff.progress}%, ${n.eff.start}..${n.eff.end}`;
+    })
+    .join("\n");
+  return `PETA AWAL WBS dari live editor.
+Jumlah baris: ${outline.all.length} (${outline.roots.length} bagian tingkat 1).
+Untuk detail, pakai tree_search dulu, lalu find_tasks atau get_subtree pada WBS yang relevan.
+
+Bagian tingkat 1:
+${sections || "(kosong)"}`;
+}
+
+/** Daftar lengkap untuk mode CLI, karena CLI belum punya tool-call interaktif. */
+function fullOutlineText(tasks: Task[]): string {
+  const outline = buildOutline(tasks);
+  const today = todayISO();
   const sections = outline.roots
     .map((n) => {
       const subs = n.children.length;
@@ -102,13 +121,20 @@ const GIT_INTENT = /\b(git|repo|repository|commit|commitan|branch|kode)\b/i;
  * Temukan repo dari nomor WBS dalam pesan terakhir. Tautan langsung menang;
  * bila kosong, naik ke induk sampai menemukan repo yang diwariskan.
  */
-export async function gitContextFor(messages: ChatMessage[]): Promise<string> {
+export async function gitContextFor(
+  messages: ChatMessage[],
+  tasks: Task[] = listTasks(),
+): Promise<string> {
   const latest = [...messages].reverse().find((message) => message.role === "user")
     ?.content ?? "";
   if (!GIT_INTENT.test(latest)) return "";
 
-  const outline = buildOutline(listTasks());
+  const outline = buildOutline(tasks);
   const byWbs = new Map(outline.all.map((node) => [node.wbs, node]));
+  const savedIds = new Set(listTasks().map((task) => task.id));
+  const saveScanIfPersisted = (taskId: string, scan: Parameters<typeof saveRepositoryScan>[0]) => {
+    if (savedIds.has(taskId)) saveRepositoryScan(scan);
+  };
   const mentioned = [
     ...new Set(
       [...latest.matchAll(/\b\d+(?:\.\d+){0,2}\b/g)]
@@ -147,7 +173,7 @@ export async function gitContextFor(messages: ChatMessage[]): Promise<string> {
     const binding = directBindings.find((item) => item.path === paths[0])!;
     const previous = getRepositoryScan(binding.id);
     const inspection = await inspectRepository(binding.path, previous);
-    saveRepositoryScan({
+    saveScanIfPersisted(binding.id, {
       taskId: binding.id,
       ...inspection.snapshot,
       checkedAt: new Date().toISOString(),
@@ -181,7 +207,7 @@ export async function gitContextFor(messages: ChatMessage[]): Promise<string> {
     [...selected.entries()].map(async ([path, info]) => {
       const previous = getRepositoryScan(info.ownerId);
       const inspection = await inspectRepository(path, previous);
-      saveRepositoryScan({
+      saveScanIfPersisted(info.ownerId, {
         taskId: info.ownerId,
         ...inspection.snapshot,
         checkedAt: new Date().toISOString(),
@@ -205,6 +231,7 @@ async function viaCli(
   messages: ChatMessage[],
   provider: "claude-cli" | "codex-cli",
   repoContext: string,
+  tasks: Task[],
 ): Promise<ChatReply> {
   const settings = readSettings();
 
@@ -213,7 +240,7 @@ async function viaCli(
   const transcript = messages
     .map((m) => `${m.role === "user" ? "Pengguna" : "Kamu"}: ${m.content}`)
     .join("\n\n");
-  const prompt = `${dateContext()}\n\n${outlineText()}${repoContext ? `\n\n${repoContext}` : ""}\n\n---\n\n${transcript}`;
+  const prompt = `${dateContext()}\n\n${fullOutlineText(tasks)}${repoContext ? `\n\n${repoContext}` : ""}\n\n---\n\n${transcript}`;
 
   const system = `${SYSTEM_INSTRUCTIONS}\n${CLI_OUTPUT_CONTRACT}`;
 
@@ -249,13 +276,14 @@ async function viaCli(
   };
 }
 
-export async function runChat(messages: ChatMessage[]): Promise<ChatReply> {
+export async function runChat(messages: ChatMessage[], taskSnapshot?: unknown): Promise<ChatReply> {
   if (messages.length === 0) throw new Error("Tidak ada pesan");
 
   const settings = readSettings();
-  const repoContext = await gitContextFor(messages);
+  const tasks = chatTasks(taskSnapshot);
+  const repoContext = await gitContextFor(messages, tasks);
   if (settings.aiProvider === "claude-cli" || settings.aiProvider === "codex-cli")
-    return viaCli(messages, settings.aiProvider, repoContext);
+    return viaCli(messages, settings.aiProvider, repoContext, tasks);
 
   if (!settings.anthropicApiKey)
     throw new Error(
@@ -278,7 +306,7 @@ export async function runChat(messages: ChatMessage[]): Promise<ChatReply> {
     { type: "text", text: SYSTEM_INSTRUCTIONS },
     {
       type: "text",
-      text: outlineText(),
+      text: initialTreeText(tasks),
       cache_control: { type: "ephemeral" },
     },
     ...(repoContext
@@ -328,7 +356,7 @@ export async function runChat(messages: ChatMessage[]): Promise<ChatReply> {
           return {
             type: "tool_result",
             tool_use_id: call.id,
-            content: runReadTool(call.name, call.input),
+            content: runReadTool(call.name, call.input, tasks),
           };
         operations.push({
           op: call.name,

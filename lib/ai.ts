@@ -41,6 +41,19 @@ export interface AiUpdate {
   status?: Status;
 }
 
+export interface AiMove {
+  wbs: string;
+  parent_wbs?: string;
+  after_wbs?: string;
+  before_wbs?: string;
+  position?: "first" | "last";
+}
+
+export interface AiSplit {
+  wbs: string;
+  tasks: AiNewTask[];
+}
+
 /**
  * Semua operasi berbentuk jamak. Alasannya bukan sekadar hemat token:
  * menyusun sub-task lewat `children` membuat anak tidak perlu menyebut nomor
@@ -55,6 +68,10 @@ export type AiOperation =
       after_wbs?: string;
     }
   | { op: "update_tasks"; updates: AiUpdate[] }
+  | { op: "move_tasks"; moves: AiMove[] }
+  | { op: "indent_tasks"; wbs: string[] }
+  | { op: "outdent_tasks"; wbs: string[] }
+  | { op: "split_tasks"; splits: AiSplit[] }
   | { op: "delete_tasks"; wbs: string[] };
 
 /** Batas kewarasan supaya satu giliran tidak menulis ribuan baris. */
@@ -114,9 +131,32 @@ const level1 = {
  */
 export const READ_TOOLS: Anthropic.Tool[] = [
   {
+    name: "tree_search",
+    description:
+      "Tampilkan peta WBS bertingkat secara ringkas. Pakai ini sebagai langkah awal untuk melihat struktur, mencari cabang besar, atau memastikan nomor WBS sebelum find_tasks/get_subtree. Bisa cari judul/WBS, dibatasi scope_wbs, dan depth.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: 'Kata kunci judul atau awal WBS, mis. "SSO", "5", atau "5.7"',
+        },
+        scope_wbs: {
+          type: "string",
+          description: 'Batasi ke dalam cabang ini, mis. "5" atau "5.7"',
+        },
+        depth: {
+          type: "integer",
+          description: "Berapa tingkat ditampilkan relatif dari scope/match. Bawaan 2.",
+        },
+        limit: { type: "integer", description: "Maksimal baris, bawaan 80" },
+      },
+    },
+  },
+  {
     name: "find_tasks",
     description:
-      "Cari baris berdasarkan kata pada judul dan/atau saringan. Pakai ini untuk menelusuri sebelum memutuskan, mis. mencari apakah sudah ada pekerjaan sejenis, atau melihat mana yang overdue di satu bagian. Bisa dibatasi ke satu cabang lewat scope_wbs.",
+      "Cari baris detail berdasarkan kata pada judul, awal WBS, dan/atau saringan. Pakai setelah tree_search untuk membuka kandidat spesifik, mis. mencari apakah sudah ada pekerjaan sejenis, melihat WBS 5.7, atau melihat mana yang overdue di satu bagian. Bisa dibatasi ke satu cabang lewat scope_wbs.",
     input_schema: {
       type: "object",
       properties: {
@@ -193,6 +233,90 @@ export const TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "move_tasks",
+    description:
+      "Pindahkan atau urutkan ulang satu atau BANYAK baris yang sudah ada. Pakai after_wbs untuk menyisipkan tepat setelah baris lain, before_wbs untuk tepat sebelum baris lain, atau parent_wbs + position first/last untuk masuk ke awal/akhir sebuah induk. Sub-task ikut terbawa.",
+    input_schema: {
+      type: "object",
+      required: ["moves"],
+      properties: {
+        moves: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["wbs"],
+            properties: {
+              wbs: { type: "string", description: "WBS baris yang dipindah" },
+              parent_wbs: {
+                type: "string",
+                description: "WBS induk tujuan. Kosongkan bila memakai before_wbs/after_wbs.",
+              },
+              after_wbs: {
+                type: "string",
+                description: "Taruh sebagai saudara tepat setelah WBS ini.",
+              },
+              before_wbs: {
+                type: "string",
+                description: "Taruh sebagai saudara tepat sebelum WBS ini.",
+              },
+              position: {
+                type: "string",
+                enum: ["first", "last"],
+                description: "Dipakai bersama parent_wbs; bawaan last.",
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  {
+    name: "indent_tasks",
+    description:
+      "Jadikan satu atau BANYAK baris sebagai anak dari saudara tepat di atasnya. Pakai untuk membuat struktur WBS lebih dalam tanpa mengubah isi task.",
+    input_schema: {
+      type: "object",
+      required: ["wbs"],
+      properties: {
+        wbs: { type: "array", items: { type: "string" }, description: "Daftar nomor WBS" },
+      },
+    },
+  },
+  {
+    name: "outdent_tasks",
+    description:
+      "Naikkan satu atau BANYAK baris satu tingkat, ditempatkan tepat setelah induknya. Pakai untuk mengeluarkan task dari parent yang salah.",
+    input_schema: {
+      type: "object",
+      required: ["wbs"],
+      properties: {
+        wbs: { type: "array", items: { type: "string" }, description: "Daftar nomor WBS" },
+      },
+    },
+  },
+  {
+    name: "split_tasks",
+    description:
+      "Pecah satu atau BANYAK task besar menjadi beberapa sub-task baru di bawah task itu. Task induk tetap ada dan tanggal/progres/statusnya akan menjadi roll-up dari anak-anaknya.",
+    input_schema: {
+      type: "object",
+      required: ["splits"],
+      properties: {
+        splits: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["wbs", "tasks"],
+            properties: {
+              wbs: { type: "string", description: "WBS task yang ingin dipecah" },
+              tasks: { type: "array", items: level2 },
+            },
+          },
+        },
+      },
+    },
+  },
+  {
     name: "delete_tasks",
     description:
       "Hapus satu atau banyak baris beserta seluruh sub-task di bawahnya. Gunakan hanya bila pengguna memintanya dengan jelas.",
@@ -212,12 +336,14 @@ Tugasmu membantu pengguna menyusun daftar pekerjaannya: menambah baris, mengubah
 
 Aturan yang harus dipatuhi:
 - Panggil tool untuk setiap perubahan. Jangan pernah mengaku sudah mengubah sesuatu tanpa memanggil tool.
-- Tool-nya jamak: kumpulkan semua penambahan ke SATU panggilan add_tasks, semua perubahan ke SATU update_tasks. Jangan memanggil tool berkali-kali untuk hal sejenis.
+- Tool-nya jamak: kumpulkan semua penambahan ke SATU panggilan add_tasks, semua perubahan ke SATU update_tasks, semua pemindahan ke SATU move_tasks. Jangan memanggil tool berkali-kali untuk hal sejenis.
 - Untuk membuat struktur bertingkat, susun lewat properti "children" di dalam satu panggilan. Baris yang baru dibuat belum punya nomor WBS, jadi tidak bisa dirujuk lewat parent_wbs di panggilan lain.
+- Untuk menyisipkan task baru di tengah daftar, pakai add_tasks dengan after_wbs saja. Untuk memindahkan task yang sudah ada ke tengah daftar, pakai move_tasks dengan after_wbs atau before_wbs.
+- Untuk memecah task besar menjadi langkah kecil, pakai split_tasks. Untuk menggeser tingkat struktur, pakai indent_tasks/outdent_tasks. Untuk mengurutkan ulang task existing, pakai move_tasks.
 - Semua perubahanmu hanya USULAN. Perubahan itu masuk sebagai perubahan tertunda yang harus disetujui pengguna lewat tombol Simpan. Jangan bilang sesuatu "sudah tersimpan".
 - Baris induk (yang punya sub-task) tanggal, progres, dan statusnya dihitung otomatis dari anak-anaknya. Jangan coba mengubahnya; ubah sub-task-nya.
 - Kedalaman maksimal 3 tingkat (n.n.n). Jangan membuat tingkat keempat.
-- MENELUSURI. Kamu punya find_tasks dan get_subtree untuk memeriksa isi daftar sebelum memutuskan. Keduanya hanya membaca, jadi pakai sesukamu — terutama untuk memastikan pekerjaan serupa belum ada, atau melihat isi sebuah bagian sampai tingkat terdalam. Jangan menebak bila bisa diperiksa.
+- MENELUSURI. Mulai dari tree_search untuk melihat peta WBS ringkas. Setelah tahu kandidat WBS seperti "5" atau "5.7", pakai find_tasks dengan query WBS itu atau get_subtree untuk membaca detail cabang. Semua tool baca aman dieksekusi; jangan menebak bila bisa diperiksa.
 - REPOSITORY GIT. Bila prompt memuat KONTEKS REPOSITORY GIT, aplikasi sudah membaca repository lokal secara read-only untukmu. Pakai branch, status, nama berkas berubah, dan commit yang diberikan; jangan bilang kamu tidak punya akses. Bila konteks menyatakan WBS belum punya repository atau ada beberapa pilihan, jelaskan itu dan minta pengguna menautkan repo lewat ikon Git atau menyebut WBS yang dimaksud.
   - Commit baru adalah bukti pekerjaan yang sudah masuk riwayat Git, tetapi hanya usulkan Done/100% bila isi commit jelas menyelesaikan task yang sama.
   - Diff staged atau belum di-stage adalah bukti pekerjaan sedang berlangsung; cocokkan nama file dan hunk dengan task yang sudah ada sebelum mengusulkan progres/status.
@@ -254,6 +380,17 @@ Isi "operations" hanya bila pengguna meminta perubahan. Bentuk tiap operasi:
 
 - Mengubah (boleh banyak sekaligus, sertakan hanya field yang diubah):
   {"op":"update_tasks","updates":[{"wbs":"5.7","progress":80}]}
+
+- Memindahkan / reorder task existing:
+  {"op":"move_tasks","moves":[{"wbs":"5.9","after_wbs":"5.7"}]}
+  {"op":"move_tasks","moves":[{"wbs":"5.9","parent_wbs":"5.7","position":"last"}]}
+
+- Indent / outdent:
+  {"op":"indent_tasks","wbs":["5.8"]}
+  {"op":"outdent_tasks","wbs":["5.8.1"]}
+
+- Memecah task menjadi sub-task:
+  {"op":"split_tasks","splits":[{"wbs":"5.7","tasks":[{"title":"Analisis kebutuhan"},{"title":"Implementasi"},{"title":"QA"}]}]}
 
 - Menghapus (beserta sub-task-nya):
   {"op":"delete_tasks","wbs":["5.7","5.8"]}
