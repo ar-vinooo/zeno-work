@@ -537,7 +537,8 @@ tampilkan task daun" agar tidak dobel dengan induknya.
 
 | Lapis | Pilihan | Alasan |
 |-------|---------|--------|
-| Framework | Next.js (App Router) + TypeScript | Satu proses untuk UI dan API lokal |
+| Shell | Electron: main + preload + renderer | Berkas, SQLite, dan kunci API tinggal di proses utama; halaman memintanya lewat IPC dan tidak pernah menyentuhnya sendiri |
+| Framework | Next.js (App Router, `output: "export"`) + TypeScript | Halaman dibangun jadi HTML/JS statis; tidak ada server yang hidup saat aplikasi jalan |
 | UI | React + Tailwind CSS v4 | Cepat menyusun tabel padat |
 | Chrome UI | Animate UI (registry shadcn) | Dropdown, dialog, tooltip, tabs. **Tidak dipakai di dalam baris tabel atau bar timeline** — satu komponen Motion per baris membuat scroll dan drag terasa berat |
 | State | Zustand (atau React state + reducer) | Ringan, cukup untuk single-user |
@@ -546,12 +547,12 @@ tampilkan task daun" agar tidak dobel dengan induknya.
 | Penyimpanan | SQLite lokal via `node:sqlite` | Data tahan lama, satu file, sinkron, dan kompatibel di Node.js maupun Electron tanpa binary ABI tambahan |
 | Timeline | Custom (div + CSS grid) | Library Gantt umumnya berat & sulit disesuaikan |
 
-**Alternatif tanpa server:** kalau ingin app benar-benar statis, ganti lapis
-penyimpanan ke IndexedDB (via Dexie) dan buang API route. Trade-off: data
-terikat ke browser, backup harus manual lewat export.
+**Alternatif yang dibuang:** menyimpan di IndexedDB supaya halaman bisa berdiri
+sendiri. Trade-off-nya terlalu mahal — data terikat ke profil browser dan hilang
+begitu data situs dibersihkan.
 
-> Keputusan default PRD ini: **SQLite lokal**, karena datanya kerjaan sendiri
-> yang sayang kalau hilang gara-gara clear browser data.
+> Keputusan PRD ini: **SQLite lokal di proses utama**, karena datanya kerjaan
+> sendiri yang sayang kalau hilang.
 
 ### 7.2 Model penyimpanan hierarki
 
@@ -587,12 +588,28 @@ CREATE INDEX idx_tasks_parent ON tasks("parentId", "order");
 
 ### 7.3 Arsitektur
 
+Satu arah, tanpa jaringan: **Renderer → IPC → Main**. Halaman tidak punya akses
+ke berkas, database, kunci API, maupun jaringan keluar — semuanya di proses
+utama, dan satu-satunya pintu adalah daftar saluran di `electron/api.ts`.
+
 ```
+Renderer (out/, disajikan lewat app://)
+  │  window.zeno.tasks.sync(diff)
+  ▼
+preload  (contextBridge, sandbox, hanya boleh require "electron")
+  │  ipcRenderer.invoke("tasks:sync", diff)
+  ▼
+Main     → lib/sync.ts → lib/db.ts (node:sqlite)
+```
+
+```
+electron/
+  api.ts                  → kontrak IPC: daftar saluran + bentuk datanya
+  preload.ts              → memasang window.zeno lewat contextBridge
+  ipc.ts                  → handler tiap saluran, dialog simpan/buka
+  main.ts                 → daur hidup app, jendela, penyaji app://
 app/
-  page.tsx                → layar utama (tabel + timeline)
-  api/tasks/route.ts      → GET semua + PUT sinkronisasi (creates, patches,
-                            deletes diterapkan berurutan dalam satu transaksi)
-  api/backup/route.ts     → export/import JSON
+  page.tsx                → cangkang statis; datanya diminta lewat IPC
 components/
   TaskTable/              → tabel, sel editable, baris tambah cepat
     OutlineCell.tsx       → nomor WBS + tombol expand/collapse
@@ -602,6 +619,10 @@ components/
     useBarDrag.ts         → drag/resize: snapping, pratinjau, Esc, auto-scroll
   Toolbar/                → filter, sorting, zoom, pencarian, ringkasan
 lib/
+  bridge.ts               → akses halaman ke window.zeno (satu-satunya jalan)
+  sync.ts                 → creates → patches → deletes, urutannya mengikat
+  chat.ts                 → asisten AI; hanya hidup di proses utama
+  xlsx.ts                 → lembar Gantt DTDI
   tree.ts                 → buildTree, flatten, computeWbs, move, indent,
                             outdent, isDescendant, normalizeOrder
   rollup.ts               → progres/tanggal/status induk, rekursif & memoized
@@ -612,6 +633,7 @@ lib/
   sort.ts                 → sorting per tingkat yang mempertahankan hierarki
 scripts/
   check-tree.ts           → pemeriksaan pohon, roll-up, sorting, filter
+  smoke-desktop.ts        → uji asap Renderer → IPC → Main pada app sungguhan
 docs/
   PRD.md
 ```
@@ -627,8 +649,10 @@ atau DB — keduanya bagian paling rawan bug dan harus punya unit test sendiri.
   memicu perhitungan ulang pada rantai leluhurnya, bukan seluruh pohon.
 - Skala target: sampai **2.000 task** tanpa virtualisasi; di atas itu pakai
   virtual scrolling atas pohon yang sudah di-flatten.
-- Tidak ada telemetri, tidak ada panggilan jaringan keluar.
-- Jalan offline sepenuhnya.
+- Tidak ada telemetri. Satu-satunya panggilan keluar adalah ke Claude saat
+  Asisten dipakai, dan itu terjadi di proses utama — halaman sendiri dikunci
+  CSP `connect-src 'self'`.
+- Jalan offline sepenuhnya (kecuali Asisten).
 
 ---
 

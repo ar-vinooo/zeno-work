@@ -1,5 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextResponse } from "next/server";
 import {
   CLI_OUTPUT_CONTRACT,
   READ_TOOLS,
@@ -7,18 +6,34 @@ import {
   TOOLS,
   dateContext,
   type AiOperation,
-} from "@/lib/ai";
-import { runReadTool } from "@/lib/ai-query";
-import { runClaudeCli, runCodexCli, stripFence } from "@/lib/ai-cli";
-import { readSettings } from "@/lib/settings";
-import { durationOf, todayISO } from "@/lib/dates";
-import { isOverdue } from "@/lib/derive";
-import { listTasks } from "@/lib/db";
-import { buildOutline } from "@/lib/rollup";
-import { STATUS_LABEL } from "@/lib/types";
+} from "./ai";
+import { runReadTool } from "./ai-query";
+import { runClaudeCli, runCodexCli, stripFence } from "./ai-cli";
+import { readSettings } from "./settings";
+import { durationOf, todayISO } from "./dates";
+import { isOverdue } from "./derive";
+import { listTasks } from "./db";
+import { buildOutline } from "./rollup";
+import { STATUS_LABEL } from "./types";
 
-export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+/**
+ * Asisten AI. Berjalan di proses utama Electron, bukan di renderer: kunci API
+ * dan CLI tidak boleh pernah tersentuh halaman.
+ *
+ * Kegagalan dilempar sebagai Error biasa — jembatan IPC yang mengubahnya jadi
+ * pesan yang ditampilkan di panel chat.
+ */
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface ChatReply {
+  text: string;
+  operations: AiOperation[];
+  costUsd?: number;
+}
 
 /**
  * Parameter penalaran berbeda per keluarga model, dan salah pasang bukan
@@ -80,14 +95,11 @@ interface CliReply {
   operations?: AiOperation[];
 }
 
-async function viaCli(request: Request, provider: "claude-cli" | "codex-cli") {
+async function viaCli(
+  messages: ChatMessage[],
+  provider: "claude-cli" | "codex-cli",
+): Promise<ChatReply> {
   const settings = readSettings();
-  const body = (await request.json()) as {
-    messages?: { role: string; content: string }[];
-  };
-  const messages = body.messages ?? [];
-  if (messages.length === 0)
-    return NextResponse.json({ error: "Tidak ada pesan" }, { status: 400 });
 
   // CLI dipanggil sekali per giliran tanpa state, jadi konteks dan riwayat
   // percakapan dikirim ulang sebagai satu prompt.
@@ -98,59 +110,49 @@ async function viaCli(request: Request, provider: "claude-cli" | "codex-cli") {
 
   const system = `${SYSTEM_INSTRUCTIONS}\n${CLI_OUTPUT_CONTRACT}`;
 
+  const result =
+    provider === "codex-cli"
+      ? await runCodexCli(
+          system,
+          prompt,
+          settings.codexModel || undefined,
+          settings.codexCliPath,
+          settings.codexEffort || undefined,
+        )
+      : await runClaudeCli(
+          system,
+          prompt,
+          settings.anthropicModel,
+          settings.claudeCliPath,
+          effortFor(settings.anthropicModel, settings.anthropicEffort),
+        );
+
+  let parsed: CliReply;
   try {
-    const result =
-      provider === "codex-cli"
-        ? await runCodexCli(
-            system,
-            prompt,
-            settings.codexModel || undefined,
-            settings.codexCliPath,
-            settings.codexEffort || undefined,
-          )
-        : await runClaudeCli(
-            system,
-            prompt,
-            settings.anthropicModel,
-            settings.claudeCliPath,
-            effortFor(settings.anthropicModel, settings.anthropicEffort),
-          );
-    let parsed: CliReply = {};
-    try {
-      parsed = JSON.parse(stripFence(result.text)) as CliReply;
-    } catch {
-      // Model tidak mematuhi bentuk JSON — tampilkan teksnya apa adanya
-      // daripada menggagalkan seluruh giliran.
-      return NextResponse.json({ text: result.text, operations: [] });
-    }
-    return NextResponse.json({
-      text: parsed.reply ?? "",
-      operations: Array.isArray(parsed.operations) ? parsed.operations : [],
-      costUsd: result.costUsd,
-    });
-  } catch (err) {
-    return NextResponse.json({ error: (err as Error).message }, { status: 502 });
+    parsed = JSON.parse(stripFence(result.text)) as CliReply;
+  } catch {
+    // Model tidak mematuhi bentuk JSON — tampilkan teksnya apa adanya
+    // daripada menggagalkan seluruh giliran.
+    return { text: result.text, operations: [] };
   }
+  return {
+    text: parsed.reply ?? "",
+    operations: Array.isArray(parsed.operations) ? parsed.operations : [],
+    costUsd: result.costUsd,
+  };
 }
 
-export async function POST(request: Request) {
+export async function runChat(messages: ChatMessage[]): Promise<ChatReply> {
+  if (messages.length === 0) throw new Error("Tidak ada pesan");
+
   const settings = readSettings();
   if (settings.aiProvider === "claude-cli" || settings.aiProvider === "codex-cli")
-    return viaCli(request, settings.aiProvider);
+    return viaCli(messages, settings.aiProvider);
 
   if (!settings.anthropicApiKey)
-    return NextResponse.json(
-      {
-        error:
-          "Kunci API belum diisi. Buka Setelan (ikon gerigi) untuk mengisinya.",
-      },
-      { status: 503 },
+    throw new Error(
+      "Kunci API belum diisi. Buka Setelan (ikon gerigi) untuk mengisinya.",
     );
-
-  const body = (await request.json()) as { messages?: Anthropic.MessageParam[] };
-  const messages = body.messages ?? [];
-  if (messages.length === 0)
-    return NextResponse.json({ error: "Tidak ada pesan" }, { status: 400 });
 
   // Kunci API yang tidak terikat workspace wajib menyertakan header ini,
   // kalau tidak permintaannya ditolak 400.
@@ -177,7 +179,10 @@ export async function POST(request: Request) {
   const MAX_ROUNDS = 4;
 
   try {
-    const conversation: Anthropic.MessageParam[] = [...messages];
+    const conversation: Anthropic.MessageParam[] = messages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
     const operations: AiOperation[] = [];
     let text = "";
 
@@ -233,30 +238,18 @@ export async function POST(request: Request) {
       conversation.push({ role: "user", content: results });
     }
 
-    return NextResponse.json({ text, operations });
+    return { text, operations };
   } catch (err) {
     if (err instanceof Anthropic.AuthenticationError)
-      return NextResponse.json(
-        { error: "ANTHROPIC_API_KEY ditolak. Periksa kuncinya." },
-        { status: 401 },
-      );
+      throw new Error("Kunci API ditolak. Periksa kuncinya di Setelan.");
     if (err instanceof Anthropic.RateLimitError)
-      return NextResponse.json(
-        { error: "Kena batas laju. Coba lagi sebentar." },
-        { status: 429 },
-      );
+      throw new Error("Kena batas laju. Coba lagi sebentar.");
     if (err instanceof Anthropic.APIError) {
       const hint = /workspace/i.test(err.message)
-        ? " Kunci API ini tidak terikat ke workspace. Isi ANTHROPIC_WORKSPACE_ID di .env, atau buat kunci baru yang sudah terikat workspace."
+        ? " Kunci API ini tidak terikat ke workspace. Isi Workspace ID di Setelan, atau buat kunci baru yang sudah terikat workspace."
         : "";
-      return NextResponse.json(
-        { error: `Gagal memanggil Claude (${err.status}): ${err.message}${hint}` },
-        { status: 502 },
-      );
+      throw new Error(`Gagal memanggil Claude (${err.status}): ${err.message}${hint}`);
     }
-    return NextResponse.json(
-      { error: (err as Error).message },
-      { status: 500 },
-    );
+    throw err;
   }
 }

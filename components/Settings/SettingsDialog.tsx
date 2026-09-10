@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/animate-ui/components/radix/dialog";
 import { Button } from "@/components/animate-ui/components/buttons/button";
+import { zeno } from "@/lib/bridge";
 import { useStore } from "@/lib/store";
 import type { AiProvider, PublicSettings } from "@/lib/settings";
 
@@ -63,9 +64,9 @@ export default function SettingsDialog() {
     if (!open) return;
     setNote(null);
     setApiKey("");
-    void fetch("/api/settings")
-      .then((r) => r.json())
-      .then((d: PublicSettings) => setData(d))
+    void zeno()
+      .settings.get()
+      .then(setData)
       .catch(() => setNote("Gagal memuat setelan."));
   }, [open]);
 
@@ -77,25 +78,20 @@ export default function SettingsDialog() {
     setBusy(true);
     setNote(null);
     try {
-      const res = await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          aiProvider: data.aiProvider,
-          anthropicModel: data.anthropicModel,
-          anthropicWorkspaceId: data.anthropicWorkspaceId,
-          anthropicEffort: data.anthropicEffort,
-          claudeCliPath: data.claudeCliPath,
-          codexCliPath: data.codexCliPath,
-          codexModel: data.codexModel,
-          codexEffort: data.codexEffort,
-          // Hanya dikirim bila kamu benar-benar mengetik sesuatu; kunci lama
-          // tidak pernah dikirim balik ke browser, jadi tidak bisa tertimpa
-          // kosong tanpa sengaja.
-          ...(apiKey ? { anthropicApiKey: apiKey } : {}),
-        }),
+      const fresh = await zeno().settings.set({
+        aiProvider: data.aiProvider,
+        anthropicModel: data.anthropicModel,
+        anthropicWorkspaceId: data.anthropicWorkspaceId,
+        anthropicEffort: data.anthropicEffort,
+        claudeCliPath: data.claudeCliPath,
+        codexCliPath: data.codexCliPath,
+        codexModel: data.codexModel,
+        codexEffort: data.codexEffort,
+        // Hanya dikirim bila kamu benar-benar mengetik sesuatu; kunci lama
+        // tidak pernah dikirim balik ke halaman, jadi tidak bisa tertimpa
+        // kosong tanpa sengaja.
+        ...(apiKey ? { anthropicApiKey: apiKey } : {}),
       });
-      const fresh = (await res.json()) as PublicSettings;
       setData(fresh);
       setApiKey("");
       setNote("Tersimpan. Berlaku langsung, tidak perlu restart.");
@@ -108,12 +104,7 @@ export default function SettingsDialog() {
 
   const clearKey = async () => {
     setBusy(true);
-    const res = await fetch("/api/settings", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ anthropicApiKey: "" }),
-    });
-    setData((await res.json()) as PublicSettings);
+    setData(await zeno().settings.set({ anthropicApiKey: "" }));
     setBusy(false);
     setNote("Kunci API dihapus.");
   };

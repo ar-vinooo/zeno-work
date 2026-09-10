@@ -1,7 +1,7 @@
 # ZenoWork
 
 Manajemen pekerjaan personal: tabel WBS bertingkat + timeline yang bisa di-drag.
-Single-user, jalan lokal, **tanpa login**.
+Aplikasi desktop single-user, jalan lokal, **tanpa login dan tanpa server**.
 
 Spesifikasi lengkap ada di [docs/PRD.md](docs/PRD.md).
 
@@ -9,34 +9,66 @@ Spesifikasi lengkap ada di [docs/PRD.md](docs/PRD.md).
 
 ```bash
 npm install
-npm run dev      # http://localhost:3939
+npm run desktop:dev     # jendela ZenoWork + hot reload
 ```
 
 Memerlukan Node.js 22.13 atau lebih baru.
 
-Database SQLite dibuat otomatis di `data/zeno-work.db` saat pertama dijalankan,
-dan diisi contoh susunan kerja supaya layar pertama tidak kosong.
+ZenoWork tidak bisa dibuka lewat browser. Semua datanya lewat jembatan IPC yang
+hanya ada di dalam jendela Electron; membuka halamannya di Chrome cuma
+memunculkan pesan bahwa jembatannya tidak ada.
+
+Database SQLite dibuat otomatis saat pertama dijalankan dan diisi contoh susunan
+kerja supaya layar pertama tidak kosong. Database dan backup disimpan permanen
+di folder data aplikasi sistem (`~/Library/Application Support/ZenoWork/data` di
+macOS atau `%APPDATA%\\ZenoWork\\data` di Windows), sehingga upgrade aplikasi
+tidak menimpa data pekerjaan.
 
 ```bash
-npm test         # pemeriksaan logika pohon, roll-up, sorting, filter
-npm run build    # build produksi
-npm run typecheck
+npm test             # logika pohon, roll-up, sorting, filter
+npm run test:desktop # uji asap Renderer → IPC → Main pada aplikasi sungguhan
+npm run typecheck    # halaman dan proses utama, dua-duanya
 ```
 
-## Desktop (Electron)
+## Arsitektur
 
-Versi desktop membuka server Next.js lokal secara internal; pengguna tidak
-perlu menjalankan terminal atau membuka browser. Database dan backup disimpan
-permanen di folder data aplikasi sistem
-(`~/Library/Application Support/ZenoWork/data` di macOS atau
-`%APPDATA%\\ZenoWork\\data` di Windows), sehingga upgrade aplikasi tidak
-menimpa data pekerjaan.
+Satu arah, tanpa jaringan lokal:
+
+```
+Renderer  halaman statis hasil `next build`, disajikan lewat skema app://
+   │      window.zeno.tasks.sync(diff)
+   ▼
+preload   contextBridge dalam sandbox — satu-satunya pintu
+   │      ipcRenderer.invoke("tasks:sync", diff)
+   ▼
+Main      lib/sync.ts → lib/db.ts (node:sqlite), lib/chat.ts, lib/xlsx.ts
+```
+
+Halaman tidak punya akses ke berkas, database, kunci API, maupun jaringan
+keluar. Daftar salurannya ada di [electron/api.ts](electron/api.ts) dan berupa
+union literal, jadi salah ketik nama saluran gagal saat kompilasi — bukan saat
+dipakai.
+
+| Saluran | Isi |
+|---------|-----|
+| `tasks:load` / `tasks:sync` | Baca seluruh tabel / kirim selisih (creates → patches → deletes) |
+| `settings:get` / `settings:set` | Setelan AI. Kunci API tidak pernah dikirim balik ke halaman |
+| `backup:save` / `backup:restore` | Export & import JSON lewat dialog sistem |
+| `export:xlsx` / `export:text` | Lembar Gantt DTDI, CSV, Markdown |
+| `chat:send` | Asisten AI — kunci API dan CLI hanya tersentuh di proses utama |
+
+## Membangun
 
 ```bash
-npm run desktop:dev           # pengembangan: Next + jendela Electron
-npm run desktop:pack          # buat ZenoWork.app tanpa installer
-npm run desktop:dist:mac      # buat DMG + ZIP macOS di release/
-npm run desktop:dist:win      # buat installer + portable EXE Windows
+npm run desktop:pack          # ZenoWork.app tanpa installer
+npm run desktop:dist:mac      # DMG + ZIP macOS di release/
+npm run desktop:dist:win      # installer + portable EXE Windows
+```
+
+Setelah dipaket, isinya bisa diuji apa adanya:
+
+```bash
+npx tsx scripts/smoke-desktop.ts --packaged
 ```
 
 Jalankan perintah distribusi pada sistem targetnya agar runtime native yang
@@ -60,7 +92,7 @@ tidak ikut diekspor, sehingga harus diatur kembali di perangkat baru.
 - View kalender bulanan: task tampil di setiap tanggal dalam rentangnya,
   navigasi bulan, sinkron dengan filter dan selection, serta opsi hanya task daun.
 - **Simpan eksplisit**: perubahan ditahan di memori; tombol **Simpan N**
-  muncul di kanan atas saat ada yang berubah, atau tekan `⌘S`. Menutup tab
+  muncul di kanan atas saat ada yang berubah, atau tekan `⌘S`. Menutup jendela
   dengan perubahan yang belum disimpan akan dikonfirmasi dulu.
 - **Sel tanggal**: klik kolom Start/End membuka kalender; kolom teksnya tetap
   menerima ketikan (`besok`, `senin`, `+3d`, `10/09`).
@@ -70,7 +102,8 @@ tidak ikut diekspor, sehingga harus diatur kembali di perangkat baru.
 - Sorting per tingkat yang tidak pernah merusak hierarki, dengan mode
   Manual / Terurut dan tombol "jadikan urutan manual".
 - Filter dengan leluhur tetap tampil sebagai konteks.
-- Undo/redo (satu drag = satu langkah), export JSON/CSV/Markdown, import JSON.
+- Undo/redo (satu drag = satu langkah). Export JSON/CSV/Markdown/XLSX dan
+  import JSON, semuanya lewat dialog simpan bawaan sistem.
 
 ## Pintasan
 
@@ -99,6 +132,9 @@ lib/tree.ts      operasi pohon murni (pindah, indent, outdent, hapus)
 lib/rollup.ts    rangkai pohon, hitung nomor WBS dan nilai roll-up
 lib/rows.ts      baris yang digambar: hierarki → collapse → filter
 lib/schedule.ts  geometri timeline (tanggal ↔ px, snapping)
-lib/store.ts     state klien, undo/redo, sinkronisasi selisih ke server
+lib/store.ts     state klien, undo/redo, sinkronisasi selisih lewat IPC
+lib/bridge.ts    akses halaman ke window.zeno
+lib/sync.ts      penerapan selisih di sisi main; urutannya mengikat
 lib/db.ts        SQLite bawaan Node, semua tulisan dalam transaksi
+electron/        kontrak IPC, preload, handler, proses utama
 ```

@@ -16,6 +16,7 @@ import {
   subtreeIds,
   topMost,
 } from "./tree";
+import { zeno } from "./bridge";
 import { applyRules } from "./validate";
 import { buildOutline } from "./rollup";
 import { MAX_TASKS_PER_CALL, type AiNewTask, type AiOperation } from "./ai";
@@ -122,7 +123,7 @@ export interface CellRef {
 
 interface Store {
   tasks: Task[];
-  /** false sampai store diisi di klien — server merender dari initialTasks. */
+  /** false sampai muatan pertama dari proses utama masuk. */
   hydrated: boolean;
   past: Task[][];
   future: Task[][];
@@ -230,9 +231,9 @@ export const useStore = create<Store>((set, get) => {
     },
 
     /**
-     * Kirim selisih terhadap `baseline` ke server. Ini satu-satunya jalan
-     * perubahan sampai ke database — mengetik, menyeret, dan menghapus hanya
-     * mengubah salinan di memori sampai tombol ini ditekan.
+     * Kirim selisih terhadap `baseline` ke proses utama. Ini satu-satunya
+     * jalan perubahan sampai ke database — mengetik, menyeret, dan menghapus
+     * hanya mengubah salinan di memori sampai tombol ini ditekan.
      */
     save: async () => {
       const { baseline, tasks, saving } = get();
@@ -242,12 +243,7 @@ export const useStore = create<Store>((set, get) => {
 
       set((s) => ({ saving: s.saving + 1 }));
       try {
-        const res = await fetch("/api/tasks", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(diff),
-        });
-        if (!res.ok) throw new Error(`Gagal menyimpan (${res.status})`);
+        await zeno().tasks.sync(diff);
         // Perubahan yang terjadi SELAMA penyimpanan tidak boleh ikut hilang,
         // jadi sisa selisihnya dihitung ulang terhadap kondisi terkini.
         set((s) => ({
@@ -441,10 +437,7 @@ export const useStore = create<Store>((set, get) => {
     },
 
     refresh: async () => {
-      const res = await fetch("/api/tasks");
-      if (!res.ok) return;
-      const data = (await res.json()) as { tasks: Task[] };
-      const restored = restoreCollapsed(data.tasks);
+      const restored = restoreCollapsed(await zeno().tasks.load());
       set({
         tasks: restored,
         baseline: restored,

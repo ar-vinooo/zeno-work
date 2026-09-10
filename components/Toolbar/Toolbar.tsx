@@ -40,6 +40,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/animate-ui/components/animate/tabs";
+import { zeno } from "@/lib/bridge";
 import { useStore } from "@/lib/store";
 import { buildOutline } from "@/lib/rollup";
 import { durationOf } from "@/lib/dates";
@@ -68,13 +69,21 @@ const ZOOMS: { value: ZoomUnit; label: string }[] = [
 
 export type WorkspaceView = "table" | "calendar";
 
-function download(name: string, content: string, type: string) {
-  const url = URL.createObjectURL(new Blob([content], { type }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  a.click();
-  URL.revokeObjectURL(url);
+/**
+ * Semua export lewat proses utama: dialog simpan bawaan sistem, lalu berkas
+ * ditulis di sana. Halaman tidak menyimpan berkas sendiri — di jendela
+ * desktop tidak ada folder unduhan yang jelas untuk dituju.
+ */
+function saveFile(run: () => Promise<unknown>) {
+  void (async () => {
+    try {
+      await run();
+    } catch (error) {
+      window.alert(
+        error instanceof Error ? error.message : "Gagal menyimpan berkas.",
+      );
+    }
+  })();
 }
 
 export default function Toolbar({
@@ -128,7 +137,7 @@ export default function Toolbar({
         n.task.id,
       ].join(","),
     );
-    download("zeno-work.csv", [head, ...lines].join("\n"), "text/csv");
+    saveFile(() => zeno().exports.text("zeno-work.csv", [head, ...lines].join("\n")));
   };
 
   const exportMarkdown = () => {
@@ -137,7 +146,7 @@ export default function Toolbar({
       (n) =>
         `${"  ".repeat(n.depth)}- **${n.wbs}** ${n.task.title} — ${n.eff.progress}% · ${n.eff.start} → ${n.eff.end}`,
     );
-    download("zeno-work.md", lines.join("\n"), "text/markdown");
+    saveFile(() => zeno().exports.text("zeno-work.md", lines.join("\n")));
   };
 
   const importJson = async (file: File) => {
@@ -150,19 +159,9 @@ export default function Toolbar({
         )
       )
         return;
-      const response = await fetch("/api/backup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tasks: parsed.tasks ?? parsed, mode: "replace" }),
-      });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as
-          | { error?: string }
-          | null;
-        throw new Error(body?.error ?? "File tidak dapat diimpor.");
-      }
+      const count = await zeno().backup.restore(parsed.tasks ?? parsed);
       await refresh();
-      window.alert("Import selesai. Semua task berhasil dipulihkan.");
+      window.alert(`Import selesai. ${count} task berhasil dipulihkan.`);
     } catch (error) {
       window.alert(
         error instanceof Error ? error.message : "File JSON tidak valid.",
@@ -411,17 +410,13 @@ export default function Toolbar({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem
-                onClick={() => {
-                  window.location.href = "/api/backup";
-                }}
+                onClick={() => saveFile(() => zeno().backup.save())}
               >
                 Export JSON (backup data)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={exportCsv}>Export CSV</DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() => {
-                  window.location.href = "/api/export/xlsx";
-                }}
+                onClick={() => saveFile(() => zeno().exports.xlsx())}
               >
                 Export XLSX (DTDI)
               </DropdownMenuItem>

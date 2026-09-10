@@ -1,10 +1,8 @@
 import ExcelJS from "exceljs";
-import { listTasks } from "@/lib/db";
-import { BAR, LEVEL_BAND, toArgb } from "@/lib/palette";
-import { buildOutline } from "@/lib/rollup";
-import type { TaskNode } from "@/lib/types";
-
-export const dynamic = "force-dynamic";
+import { listTasks } from "./db";
+import { BAR, LEVEL_BAND, toArgb } from "./palette";
+import { buildOutline } from "./rollup";
+import type { TaskNode } from "./types";
 
 /**
  * Export XLSX format DTDI: tabel WBS + Gantt mingguan.
@@ -95,7 +93,11 @@ const HEAD_MONTH = 2;
 const HEAD_WEEK = 3;
 const FIRST_DATA_ROW = 4;
 
-export async function GET() {
+/** Nama berkas yang ditawarkan di dialog simpan. */
+export const xlsxFileName = () =>
+  `zenowork-dtdi-${new Date().toISOString().slice(0, 10)}.xlsx`;
+
+export async function buildTimelineWorkbook(): Promise<Buffer> {
   const outline = buildOutline(listTasks(), { column: "manual", dir: "asc" });
   const nodes = outline.all;
 
@@ -119,8 +121,7 @@ export async function GET() {
   ws.getColumn(COL_END).width = 11;
 
   if (nodes.length === 0) {
-    const buffer = await wb.xlsx.writeBuffer();
-    return download(buffer);
+    return Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer);
   }
 
   /* Rentang waktu = gabungan seluruh baris, dibulatkan ke bulan penuh. */
@@ -249,17 +250,5 @@ export async function GET() {
     }
   });
 
-  const buffer = await wb.xlsx.writeBuffer();
-  return download(buffer);
-}
-
-function download(buffer: ArrayBuffer | ExcelJS.Buffer) {
-  const stamp = new Date().toISOString().slice(0, 10);
-  return new Response(buffer as ArrayBuffer, {
-    headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="zenowork-dtdi-${stamp}.xlsx"`,
-    },
-  });
+  return Buffer.from((await wb.xlsx.writeBuffer()) as ArrayBuffer);
 }

@@ -5,8 +5,10 @@ import { Send, Sparkles, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/animate-ui/components/buttons/button";
+import { zeno } from "@/lib/bridge";
 import { useStore } from "@/lib/store";
 import type { AiOperation } from "@/lib/ai";
+import type { ChatMessage } from "@/lib/chat";
 
 interface Turn {
   role: "user" | "assistant";
@@ -15,11 +17,8 @@ interface Turn {
   applied?: string[];
 }
 
-/** Bentuk pesan yang dikirim ke API — sengaja minimal, bukan tipe SDK. */
-interface WireMessage {
-  role: "user" | "assistant";
-  content: string;
-}
+/** Bentuk pesan yang dikirim lewat IPC — sengaja minimal, bukan tipe SDK. */
+type WireMessage = ChatMessage;
 
 const WIDTH_KEY = "zenowork.chat-width";
 const WIDTH_DEFAULT = 340;
@@ -117,17 +116,7 @@ export default function ChatPanel() {
     setTurns((prev) => [...prev, { role: "user", text }]);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history }),
-      });
-      const data = (await res.json()) as {
-        text?: string;
-        operations?: AiOperation[];
-        error?: string;
-      };
-      if (!res.ok) throw new Error(data.error ?? `Gagal (${res.status})`);
+      const data = await zeno().chat.send(history);
 
       const applied = data.operations?.length
         ? applyAiOperations(data.operations)

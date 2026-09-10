@@ -18,21 +18,19 @@ import {
 } from "@/components/animate-ui/components/radix/alert-dialog";
 import { buttonVariants } from "@/components/animate-ui/components/buttons/button";
 import { diffDays, maxISO, minISO, shiftISO, todayISO, weekStartISO } from "@/lib/dates";
+import { zeno } from "@/lib/bridge";
 import { computeRows } from "@/lib/rows";
 import { makeScale, xForDate } from "@/lib/schedule";
 import { useStore } from "@/lib/store";
 import { childrenOf, subtreeIds, topMost } from "@/lib/tree";
-import type { Task } from "@/lib/types";
 
 const PAD = { day: 10, week: 21, month: 60 } as const;
 
-export default function App({ initialTasks }: { initialTasks: Task[] }) {
+export default function App() {
   const hydrate = useStore((s) => s.hydrate);
-  const storeTasks = useStore((s) => s.tasks);
+  const tasks = useStore((s) => s.tasks);
   const hydrated = useStore((s) => s.hydrated);
-  // Sebelum store terisi (render server dan render klien pertama) pakai data
-  // dari server, supaya baris sudah tergambar tanpa kedipan kosong.
-  const tasks = hydrated ? storeTasks : initialTasks;
+  const [loadError, setLoadError] = useState<string | null>(null);
   const sort = useStore((s) => s.sort);
   const filters = useStore((s) => s.filters);
   const zoom = useStore((s) => s.zoom);
@@ -46,9 +44,26 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
   const [view, setView] = useState<WorkspaceView>("table");
   const [calendarTodayToken, setCalendarTodayToken] = useState(0);
 
+  // Muatan pertama dari proses utama. Sampai ini selesai tabelnya belum
+  // digambar sama sekali — lebih baik daripada memperlihatkan tabel kosong
+  // yang tak bisa dibedakan dari "datamu memang habis".
   useEffect(() => {
-    hydrate(initialTasks);
-  }, [hydrate, initialTasks]);
+    let cancelled = false;
+    void (async () => {
+      try {
+        const rows = await zeno().tasks.load();
+        if (!cancelled) hydrate(rows);
+      } catch (error) {
+        if (!cancelled)
+          setLoadError(
+            error instanceof Error ? error.message : "Gagal memuat data.",
+          );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hydrate]);
 
   const { rows, matchedNodes, stats, outline } = useMemo(
     () => computeRows(tasks, sort, filters),
@@ -282,6 +297,13 @@ export default function App({ initialTasks }: { initialTasks: Task[] }) {
     window.addEventListener("beforeunload", onLeave);
     return () => window.removeEventListener("beforeunload", onLeave);
   }, [store]);
+
+  if (!hydrated)
+    return (
+      <div className="flex h-full items-center justify-center px-8 text-center text-[13px] text-[var(--color-ink-soft)]">
+        {loadError ?? "Memuat…"}
+      </div>
+    );
 
   return (
     <div className="flex h-full flex-col">

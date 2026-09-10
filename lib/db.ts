@@ -3,12 +3,17 @@ import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import type { Patch, Task } from "./types";
 
-// Electron mengisi ZENO_DATA_DIR dengan folder userData milik sistem. Versi
-// web lokal tetap memakai ./data agar perilaku lama tidak berubah.
-const DATA_DIR = process.env.ZENO_DATA_DIR
-  ? path.resolve(process.env.ZENO_DATA_DIR)
-  : path.join(process.cwd(), "data");
-const DB_PATH = process.env.ZENO_DB ?? path.join(DATA_DIR, "zeno-work.db");
+// Electron mengisi ZENO_DATA_DIR dengan folder userData milik sistem; skrip
+// baris perintah (tsx scripts/*.ts) tetap memakai ./data.
+//
+// Dihitung saat dipakai, bukan saat modul diimpor: proses utama Electron baru
+// tahu folder userData setelah app.setName(), yang terjadi setelah impor.
+const dataDir = () =>
+  process.env.ZENO_DATA_DIR
+    ? path.resolve(process.env.ZENO_DATA_DIR)
+    : path.join(process.cwd(), "data");
+const dbPath = () => process.env.ZENO_DB ?? path.join(dataDir(), "zeno-work.db");
+const backupDir = () => path.join(dataDir(), "backups");
 
 type Row = Omit<Task, "collapsed" | "rollup"> & {
   collapsed: number;
@@ -40,8 +45,9 @@ CREATE TABLE IF NOT EXISTS meta (
 `;
 
 function open(): DatabaseSync {
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  const conn = new DatabaseSync(DB_PATH, {
+  const file = dbPath();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const conn = new DatabaseSync(file, {
     timeout: 5_000,
     enableForeignKeyConstraints: true,
   });
@@ -61,6 +67,17 @@ const globalForDb = globalThis as unknown as { zenoDb?: DatabaseSync };
 export function getDb(): DatabaseSync {
   if (!globalForDb.zenoDb) globalForDb.zenoDb = open();
   return globalForDb.zenoDb;
+}
+
+/** Tutup koneksi saat aplikasi berhenti agar isi WAL ikut tersimpan. */
+export function closeDb(): void {
+  if (!globalForDb.zenoDb) return;
+  try {
+    globalForDb.zenoDb.close();
+  } catch {
+    // Sudah tertutup — tidak ada yang perlu dilakukan.
+  }
+  globalForDb.zenoDb = undefined;
 }
 
 /** `node:sqlite` sengaja dipakai agar web dan Electron tidak membutuhkan
@@ -191,7 +208,6 @@ export function setMeta(key: string, value: string): void {
     .run(key, value);
 }
 
-const BACKUP_DIR = path.join(DATA_DIR, "backups");
 const KEEP_BACKUPS = 7;
 
 /**
@@ -202,9 +218,10 @@ const KEEP_BACKUPS = 7;
 export function snapshotDaily(): void {
   const tasks = listTasks();
   if (tasks.length === 0) return;
-  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  const dir = backupDir();
+  fs.mkdirSync(dir, { recursive: true });
   const file = path.join(
-    BACKUP_DIR,
+    dir,
     `zeno-work-${new Date().toISOString().slice(0, 10)}.json`,
   );
   if (fs.existsSync(file)) return;
@@ -213,11 +230,11 @@ export function snapshotDaily(): void {
     JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), tasks }, null, 2),
   );
   const older = fs
-    .readdirSync(BACKUP_DIR)
+    .readdirSync(dir)
     .filter((f) => f.endsWith(".json"))
     .sort()
     .slice(0, -KEEP_BACKUPS);
-  for (const f of older) fs.rmSync(path.join(BACKUP_DIR, f), { force: true });
+  for (const f of older) fs.rmSync(path.join(dir, f), { force: true });
 }
 
-export { DB_PATH, BACKUP_DIR };
+export { dbPath, backupDir };
