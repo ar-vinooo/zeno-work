@@ -1,0 +1,55 @@
+name: Release
+
+# Windows app tidak bisa dibangun dari macOS tanpa Wine, dan sebaliknya juga
+# begitu. Karena itu tiap sistem dibangun di runner-nya sendiri, lalu hasilnya
+# dilampirkan ke satu GitHub Release yang sama.
+#
+# Pemicunya tag `v*`. Versi di tag HARUS sama dengan "version" di package.json,
+# karena electron-builder menentukan release tujuannya dari situ.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: macOS (arm64 + x64)
+            args: --mac --arm64 --x64
+          - os: windows-latest
+            label: Windows (x64)
+            args: --win --x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build halaman statis
+        run: npm run build
+
+      - name: Kompilasi proses utama
+        run: npm run electron:build
+
+      - name: Paket & unggah ke Release
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Runner tidak punya sertifikat Apple. Tanpa baris ini
+          # electron-builder mencari identitas penanda tangan lalu gagal.
+          CSC_IDENTITY_AUTO_DISCOVERY: false

@@ -71,6 +71,30 @@ Setelah dipaket, isinya bisa diuji apa adanya:
 npx tsx scripts/smoke-desktop.ts --packaged
 ```
 
+### Release ke GitHub
+
+Windows app tidak bisa dibangun dari macOS tanpa Wine, jadi rilis dikerjakan
+GitHub Actions: tiap sistem dibangun di runner-nya sendiri lalu dilampirkan ke
+satu Release yang sama.
+
+```bash
+npm version minor                      # naikkan versi + bikin tag v0.x.0
+git push origin main --follow-tags     # tag inilah yang memicu build
+```
+
+Tag `v*` menjalankan [.github/workflows/release.yml](.github/workflows/release.yml)
+— macOS (DMG + ZIP, arm64 dan x64) serta Windows (installer NSIS + portable
+EXE). Versi di tag harus sama dengan `version` di `package.json`; `npm version`
+sudah menjaganya sejalan.
+
+Aplikasi macOS-nya **tidak ditandatangani** — runner GitHub tidak punya
+sertifikat Apple. Saat pertama dibuka macOS akan menolaknya. Lepaskan
+karantinanya sekali:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/ZenoWork.app
+```
+
 Jalankan perintah distribusi pada sistem targetnya agar runtime native yang
 terpaket sesuai: macOS untuk DMG/ZIP, Windows x64 untuk installer/portable EXE.
 

@@ -1,6 +1,6 @@
 {
   "name": "zeno-work",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Aplikasi desktop manajemen pekerjaan personal dengan WBS, timeline, dan kalender.",
   "author": "Zeno",
   "private": true,
@@ -60,6 +60,13 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ar-vinooo",
+        "repo": "zeno-work"
+      }
+    ],
     "files": [
       "dist-electron/**/*",
       "out/**/*",
