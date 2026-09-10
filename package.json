@@ -60,13 +60,6 @@
     "directories": {
       "output": "release"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "ar-vinooo",
-        "repo": "zeno-work"
-      }
-    ],
     "files": [
       "dist-electron/**/*",
       "out/**/*",
