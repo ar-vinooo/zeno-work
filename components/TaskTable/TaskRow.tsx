@@ -176,6 +176,17 @@ function TaskRow({
           ? "var(--color-row-2)"
           : "var(--color-surface)";
   const todayX = xForDate(scale, today);
+  const leftEdgeShadow = selected
+    ? "inset 3px 0 0 0 var(--color-mark)"
+    : aiEdited
+      ? "inset 3px 0 0 0 var(--color-ai-edge)"
+      : null;
+  const leftPaneShadow = [
+    leftEdgeShadow,
+    "inset -1px 0 0 var(--color-line)",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   const cell = (field: CellRef["field"]) =>
     editing?.id === task.id && editing.field === field;
@@ -195,11 +206,7 @@ function TaskRow({
         style={{
           width: "var(--col-left)",
           background,
-          boxShadow: selected
-            ? "inset 3px 0 0 0 var(--color-mark)"
-            : aiEdited
-              ? "inset 3px 0 0 0 var(--color-ai-edge)"
-              : undefined,
+          boxShadow: leftPaneShadow,
         }}
         title={aiEdited ? "Diubah asisten AI, belum disimpan" : undefined}
       >

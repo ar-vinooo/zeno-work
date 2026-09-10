@@ -52,6 +52,9 @@ export default function TimelineHeader({ scale, width, todayX }: Props) {
       });
     }
   }
+  const todayTick = ticks.find(
+    (tick) => todayX >= tick.x && todayX < tick.x + tick.w,
+  );
 
   return (
     <div className="relative shrink-0" style={{ width, height: 40 }}>
@@ -66,12 +69,24 @@ export default function TimelineHeader({ scale, width, todayX }: Props) {
           </div>
         ))}
       </div>
-      <div className="relative h-5">
+      <div className="relative h-5 border-b border-[var(--color-line-strong)]">
         {ticks.map((t) => (
           <div
             key={t.x}
-            className="num absolute top-0 text-center text-[9px] leading-5 text-[var(--color-faint)]"
-            style={{ left: t.x, width: t.w }}
+            className="num absolute top-0 h-5 border-l text-center text-[9px] leading-5"
+            style={{
+              left: t.x,
+              width: t.w,
+              background: t === todayTick ? "var(--color-mark)" : undefined,
+              borderLeftColor:
+                t === todayTick
+                  ? "var(--color-mark)"
+                  : 
+                scale.unit === "day"
+                  ? "var(--color-line)"
+                  : "var(--color-line-strong)",
+                  color: t === todayTick ? "white" : "var(--color-faint)"
+            }}
           >
             {t.label}
           </div>

@@ -358,6 +358,7 @@ export default function Grid({
               width: "var(--col-left)",
               height: 40,
               background: "var(--color-raised)",
+              boxShadow: "inset -1px 0 0 var(--color-line-strong)",
             }}
           >
             <div
@@ -458,7 +459,11 @@ export default function Grid({
           <div className="row flex" style={{ height: ROW_H }}>
             <div
               className="sticky left-0 z-10 flex items-center border-b border-[var(--color-line)] px-2"
-              style={{ width: "var(--col-left)", background: "var(--color-surface)" }}
+              style={{
+                width: "var(--col-left)",
+                background: "var(--color-surface)",
+                boxShadow: "inset -1px 0 0 var(--color-line)",
+              }}
             >
               <button
                 className="text-[12px] text-[var(--color-faint)] hover:text-[var(--color-mark)]"

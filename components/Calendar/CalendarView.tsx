@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, LocateFixed } from "lucide-react";
 import { Button } from "@/components/animate-ui/components/buttons/button";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   diffDays,
   fromISO,
   monthEndISO,
@@ -49,6 +54,10 @@ function monthLabel(month: string) {
     month: "long",
     year: "numeric",
   }).format(fromISO(month));
+}
+
+function taskLabel(node: TaskNode) {
+  return `${node.wbs} ${node.task.title}`;
 }
 
 export default function CalendarView({
@@ -226,9 +235,61 @@ export default function CalendarView({
                   </button>
                 ))}
                 {dayNodes.length > MAX_VISIBLE && (
-                  <div className="px-1 text-[10px] text-[var(--color-faint)]">
-                    +{dayNodes.length - MAX_VISIBLE} lainnya
-                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="w-full rounded px-1 text-left text-[10px] text-[var(--color-mark)] hover:bg-[var(--color-raised)]"
+                        title={`Lihat semua task tanggal ${day}`}
+                      >
+                        +{dayNodes.length - MAX_VISIBLE} lainnya
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      side="right"
+                      className="max-h-80 w-[calc(100vw-2rem)] max-w-[24rem] overflow-y-auto border border-[var(--color-line)] bg-[var(--color-surface)] p-2 text-[11px] text-[var(--color-ink)] sm:w-96"
+                    >
+                      <div className="mb-1.5 flex items-center justify-between gap-3 border-b border-[var(--color-line)] pb-1.5">
+                        <div className="font-semibold">{day}</div>
+                        <div className="num text-[var(--color-faint)]">
+                          {dayNodes.length} task
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        {dayNodes.map((node) => (
+                          <button
+                            key={node.task.id}
+                            type="button"
+                            className={`block w-full rounded border-l-2 px-2 py-1 text-left transition-colors hover:bg-[var(--color-raised)] ${
+                              selectionSet.has(node.task.id)
+                                ? "ring-1 ring-[var(--color-mark)]"
+                                : ""
+                            } ${node.children.length ? "font-semibold" : ""}`}
+                            style={statusStyle[node.eff.status]}
+                            title={`${taskLabel(node)} · ${STATUS_LABEL[node.eff.status]} · ${node.eff.start} → ${node.eff.end}\nKlik ganda untuk buka di tabel`}
+                            onClick={(event) =>
+                              select(
+                                node.task.id,
+                                event.metaKey || event.ctrlKey
+                                  ? "toggle"
+                                  : "replace",
+                              )
+                            }
+                            onDoubleClick={onOpenTable}
+                          >
+                            <span className="mr-1 font-mono text-[10px] opacity-60">
+                              {node.wbs}
+                            </span>
+                            {node.task.title}
+                            <span className="ml-1 text-[10px] text-[var(--color-ink-soft)]">
+                              · {STATUS_LABEL[node.eff.status]}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 )}
               </div>
             </div>
