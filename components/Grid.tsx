@@ -18,7 +18,7 @@ import {
 import { useBarDrag } from "./Timeline/useBarDrag";
 import { todayISO } from "@/lib/dates";
 import { xForDate, type Scale } from "@/lib/schedule";
-import { useStore, type CellRef } from "@/lib/store";
+import { useStore, type CellRef, type DragMode } from "@/lib/store";
 import { childrenOf, subtreeIds } from "@/lib/tree";
 import type { Row } from "@/lib/types";
 
@@ -235,13 +235,30 @@ export default function Grid({
     [fields, ordered, setEditing],
   );
 
+  /**
+   * Selection dibaca dari store saat klik terjadi, bukan lewat langganan.
+   * Kalau `selectionSet`/`selection` ikut jadi dependensi, callback ini lahir
+   * ulang tiap kali selection berubah — dan karena `memo(TaskRow)` memakai
+   * perbandingan dangkal, satu prop yang berganti referensi membatalkan
+   * memoisasi SELURUH baris. Memilih satu baris jadi menggambar ulang semuanya.
+   */
   const onSelect = useCallback(
     (event: React.MouseEvent, id: string) => {
-      if (event.shiftKey) select(id, "range", ordered);
-      else if (event.metaKey || event.ctrlKey) select(id, "toggle");
-      else if (!selectionSet.has(id) || selection.length > 1) select(id);
+      if (event.shiftKey) return select(id, "range", ordered);
+      if (event.metaKey || event.ctrlKey) return select(id, "toggle");
+      const current = useStore.getState().selection;
+      if (!current.includes(id) || current.length > 1) select(id);
     },
-    [ordered, select, selection.length, selectionSet],
+    [ordered, select],
+  );
+
+  /** `scale` harus diikat, jadi tidak bisa dioper apa adanya seperti callback
+   *  store lain. Dibungkus di sini supaya referensinya hanya berganti saat
+   *  skalanya benar-benar berubah — bukan tiap render. */
+  const onBarDrag = useCallback(
+    (event: React.PointerEvent, id: string, mode: DragMode) =>
+      beginBarDrag(event, id, mode, scale),
+    [beginBarDrag, scale],
   );
 
   /**
@@ -416,11 +433,11 @@ export default function Grid({
               editing={editing}
               onEdit={setEditing}
               onNavigate={navigate}
-              onEnterRow={(id) => addSiblingAfter(id)}
+              onEnterRow={addSiblingAfter}
               onSelect={onSelect}
               onRowDragStart={onRowDragStart}
               onRequestDelete={onRequestDelete}
-              onBarDrag={(e, id, mode) => beginBarDrag(e, id, mode, scale)}
+              onBarDrag={onBarDrag}
             />
           ))}
 
