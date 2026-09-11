@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CalendarView from "./Calendar/CalendarView";
 import Grid from "./Grid";
+import SummaryView from "./Summary/SummaryView";
 import Toolbar, { type WorkspaceView } from "./Toolbar/Toolbar";
 import ChatPanel from "./Chat/ChatPanel";
 import SettingsDialog from "./Settings/SettingsDialog";
@@ -70,10 +71,16 @@ export default function App() {
     };
   }, [hydrate]);
 
-  const { rows, matchedNodes, stats, outline } = useMemo(
+  const { rows, matchedNodes, stats, outline, filtering } = useMemo(
     () => computeRows(tasks, filters, focusRootId),
     [tasks, filters, focusRootId],
   );
+
+  const summaryRoots = useMemo(() => {
+    if (!focusRootId) return outline.roots;
+    const focusRoot = outline.byId.get(focusRootId);
+    return focusRoot ? [focusRoot] : [];
+  }, [focusRootId, outline]);
 
   const scale = useMemo(() => {
     const today = todayISO();
@@ -269,7 +276,7 @@ export default function App() {
       }
       if (e.key === "Enter" && selected) {
         e.preventDefault();
-        if (view === "calendar") setView("table");
+        if (view !== "table") setView("table");
         return s.setEditing({ id: selected, field: "title" });
       }
       if (e.key === "Delete" || e.key === "Backspace") {
@@ -278,7 +285,7 @@ export default function App() {
       }
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
-        if (view === "calendar") setView("table");
+        if (view !== "table") setView("table");
         if (e.shiftKey && selected) return void s.addChildOf(selected);
         return void s.addSiblingAfter(selected ?? rows[rows.length - 1]?.task.id ?? null);
       }
@@ -327,11 +334,22 @@ export default function App() {
             onRequestDelete={requestDelete}
             isEmpty={tasks.length === 0}
           />
-        ) : (
+        ) : view === "calendar" ? (
           <CalendarView
             nodes={matchedNodes}
             todayToken={calendarTodayToken}
             onOpenTable={() => setView("table")}
+          />
+        ) : (
+          <SummaryView
+            nodes={summaryRoots}
+            matchedNodes={matchedNodes}
+            filtering={filtering}
+            onFocusTask={(id) => {
+              store.getState().select(id);
+              store.getState().setFocusRoot(id);
+              setView("table");
+            }}
           />
         )}
         <ChatPanel />

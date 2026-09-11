@@ -12,6 +12,7 @@ import {
   Monitor,
   Moon,
   Redo2,
+  LayoutDashboard,
   RotateCcw,
   Save,
   Search,
@@ -84,7 +85,7 @@ const ZOOMS: { value: ZoomUnit; label: string }[] = [
   { value: "month", label: "Bulan" },
 ];
 
-export type WorkspaceView = "table" | "calendar";
+export type WorkspaceView = "table" | "calendar" | "summary";
 
 /**
  * Semua export lewat proses utama: dialog simpan bawaan sistem, lalu berkas
@@ -271,6 +272,10 @@ export default function Toolbar({
             <TabsTrigger value="calendar" className="h-6 gap-1 px-2 text-[11px]">
               <CalendarDays className="size-3" />
               Kalender
+            </TabsTrigger>
+            <TabsTrigger value="summary" className="h-6 gap-1 px-2 text-[11px]">
+              <LayoutDashboard className="size-3" />
+              Summary
             </TabsTrigger>
           </TabsList>
         </Tabs>
