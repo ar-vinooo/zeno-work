@@ -36,6 +36,11 @@ const api: ZenoApi = {
     xlsx: () => invoke("export:xlsx"),
     text: (fileName, content) => invoke("export:text", fileName, content),
   },
+  evidence: {
+    attach: (taskId) => invoke("evidence:attach", taskId),
+    read: (relPath) => invoke("evidence:read", relPath),
+    reveal: (relPath) => invoke("evidence:reveal", relPath),
+  },
   chat: {
     send: (messages, tasks) => invoke("chat:send", messages, tasks),
   },

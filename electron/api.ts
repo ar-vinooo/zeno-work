@@ -1,7 +1,7 @@
 import type { PublicSettings, Settings } from "../lib/settings";
 import type { ChatMessage, ChatReply, ChatSnapshot } from "../lib/chat";
 import type { SyncDiff } from "../lib/sync";
-import type { Task } from "../lib/types";
+import type { EvidenceAsset, Task } from "../lib/types";
 import type { RepositorySummary } from "../lib/repository";
 
 /**
@@ -27,6 +27,9 @@ export type Channel =
   | "backup:restore"
   | "export:xlsx"
   | "export:text"
+  | "evidence:attach"
+  | "evidence:read"
+  | "evidence:reveal"
   | "chat:send";
 
 /** Hasil dialog simpan. `saved: false` berarti pengguna menekan Batal. */
@@ -70,6 +73,14 @@ export interface ZenoApi {
     xlsx(): Promise<SaveResult>;
     /** CSV / Markdown: isinya sudah dirakit di halaman, main tinggal menyimpan. */
     text(fileName: string, content: string): Promise<SaveResult>;
+  };
+  evidence: {
+    /** Pilih berkas lalu salin ke folder data. Daftar kosong = pengguna membatalkan. */
+    attach(taskId: string): Promise<EvidenceAsset[]>;
+    /** Isi berkas untuk pratinjau di halaman; dibungkus jadi blob di sana. */
+    read(relPath: string): Promise<Uint8Array>;
+    /** Buka lampiran dengan aplikasi bawaan sistem. */
+    reveal(relPath: string): Promise<void>;
   };
   chat: {
     send(messages: ChatMessage[], snapshot: ChatSnapshot): Promise<ChatReply>;

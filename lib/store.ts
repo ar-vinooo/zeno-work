@@ -23,7 +23,7 @@ import { buildOutline } from "./rollup";
 import { MAX_TASKS_PER_CALL, type AiNewTask, type AiOperation } from "./ai";
 import { shiftISO, diffDays } from "./dates";
 import { EMPTY_FILTERS } from "./types";
-import type { Filters, Patch, Task } from "./types";
+import type { EvidenceEntry, Filters, Patch, Task } from "./types";
 import type { ZoomUnit } from "./schedule";
 
 interface Diff {
@@ -43,8 +43,16 @@ const COMPARED: (keyof Task)[] = [
   "priority",
   "rollup",
   "notes",
+  "evidence",
   "repositoryPath",
 ];
+
+// evidence adalah array: `!==` selalu benar begitu objek task dibuat ulang,
+// sehingga tiap task akan tampak kotor dan hitungan pending jadi ngawur.
+const sameValue = (key: keyof Task, a: Task, b: Task) =>
+  key === "evidence"
+    ? JSON.stringify(a.evidence) === JSON.stringify(b.evidence)
+    : a[key] === b[key];
 
 function diffTasks(prev: Task[], next: Task[]): Diff {
   const before = indexById(prev);
@@ -62,7 +70,7 @@ function diffTasks(prev: Task[], next: Task[]): Diff {
     const patch: Patch = { id: task.id };
     let changed = false;
     for (const key of COMPARED)
-      if (old[key] !== task[key]) {
+      if (!sameValue(key, old, task)) {
         (patch as Record<string, unknown>)[key] = task[key];
         changed = true;
       }
@@ -180,6 +188,8 @@ interface Store {
   showDuration: boolean;
   chatOpen: boolean;
   settingsOpen: boolean;
+  /** Task yang sedang dibuka di modal catatan & bukti. null = tertutup. */
+  evidenceTaskId: string | null;
   /** Baris yang diubah AI dan belum disimpan — ditandai di tabel. */
   aiTouched: string[];
   saving: number;
@@ -197,6 +207,12 @@ interface Store {
   patchTask: (id: string, patch: Omit<Patch, "id">) => void;
   /** Tautan Git sengaja langsung disimpan agar asisten bisa membacanya saat itu juga. */
   setRepositoryPath: (id: string, repositoryPath: string) => Promise<void>;
+  /** Simpan deskripsi & bukti satu task tanpa menyentuh perubahan task lain. */
+  saveEvidence: (
+    id: string,
+    notes: string,
+    evidence: EvidenceEntry[],
+  ) => Promise<void>;
   addSiblingAfter: (id: string | null) => string;
   addChildOf: (id: string) => string;
   removeSelected: (mode: "cascade" | "promote") => void;
@@ -219,6 +235,7 @@ interface Store {
   toggleDurationColumn: () => void;
   toggleChat: () => void;
   setSettingsOpen: (open: boolean) => void;
+  setEvidenceTask: (id: string | null) => void;
   /** Terapkan usulan AI sebagai SATU perubahan tertunda dan satu langkah undo. */
   applyAiOperations: (ops: AiOperation[]) => string[];
   undo: () => void;
@@ -259,6 +276,7 @@ export const useStore = create<Store>((set, get) => {
     showDuration: false,
     chatOpen: false,
     settingsOpen: false,
+    evidenceTaskId: null,
     aiTouched: [],
     saving: 0,
     error: null,
@@ -392,6 +410,49 @@ export const useStore = create<Store>((set, get) => {
         });
 
       await repositoryPathQueue;
+    },
+
+    /**
+     * Simpan deskripsi & bukti SATU task saja.
+     *
+     * Tombol Simpan di toolbar mengirim seluruh selisih terhadap baseline, jadi
+     * menekannya dari modal akan ikut mendorong perubahan task lain yang masih
+     * sengaja ditahan. Di sini hanya dua kolom milik satu baris yang dikirim,
+     * lalu baseline-nya ditambal setempat supaya hitungan pending sisanya utuh.
+     */
+    saveEvidence: async (id, notes, evidence) => {
+      if (!indexById(get().tasks).get(id)) return;
+
+      // Baris yang belum pernah tersimpan tidak punya pasangan di database, dan
+      // syncTasks membuang patch untuk id yang tidak dikenalnya — tanpa
+      // penjagaan ini tombolnya akan terlihat berhasil padahal tidak menulis apa pun.
+      if (!indexById(get().baseline).get(id))
+        throw new Error(
+          "Task ini belum pernah disimpan. Tekan Simpan di toolbar dulu.",
+        );
+
+      const patch: Patch = { id, notes, evidence };
+
+      set((s) => ({ saving: s.saving + 1 }));
+      try {
+        await zeno().tasks.sync({ patches: [patch] });
+        // tasks DAN baseline ditambal bersamaan: selisih kedua kolom ini jadi
+        // nol, sehingga hitungan pending milik task lain sama sekali tidak
+        // bergeser. Sengaja tidak lewat commit() — ini penyimpanan eksplisit,
+        // bukan satu langkah undo.
+        set((s) => {
+          const tasks = applyPatchList(s.tasks, [patch]);
+          const baseline = applyPatchList(s.baseline, [patch]);
+          return {
+            tasks,
+            baseline,
+            pending: countDiff(diffTasks(baseline, tasks)),
+            error: null,
+          };
+        });
+      } finally {
+        set((s) => ({ saving: Math.max(0, s.saving - 1) }));
+      }
     },
 
     addSiblingAfter: (id) => {
@@ -568,6 +629,7 @@ export const useStore = create<Store>((set, get) => {
     toggleDurationColumn: () => set((s) => ({ showDuration: !s.showDuration })),
     toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen })),
     setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
+    setEvidenceTask: (evidenceTaskId) => set({ evidenceTaskId }),
 
     applyAiOperations: (ops) => {
       let tasks = get().tasks;

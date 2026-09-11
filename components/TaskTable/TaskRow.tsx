@@ -108,6 +108,7 @@ function TaskRow({
   const addChildOf = useStore((s) => s.addChildOf);
   const addSiblingAfter = useStore((s) => s.addSiblingAfter);
   const setFocusRoot = useStore((s) => s.setFocusRoot);
+  const setEvidenceTask = useStore((s) => s.setEvidenceTask);
   const preview = useStore((s) => s.preview);
   const aiEdited = useStore((s) => s.aiTouched.includes(row.task.id));
 
@@ -153,6 +154,8 @@ function TaskRow({
   const isPrimary = previewing && preview!.ids[0] === task.id;
   const overdue = isOverdue(display);
   const hasChildren = row.children.length > 0;
+  const noteCount = row.task.evidence?.length ?? 0;
+  const hasNote = noteCount > 0 || row.task.notes.trim() !== "";
   const readOnly = row.derived;
   const statusBackground = STATUS_PILL[backgroundStatus(display.progress)].bg;
   const today = todayISO();
@@ -285,6 +288,32 @@ function TaskRow({
             }}
           >
             ◎
+          </Button>
+          {/* Selalu terlihat saat sudah ada isinya — penanda ini yang
+              memberi tahu baris mana yang sudah punya bukti. */}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={`size-3 shrink-0 p-0 text-center text-[11px] leading-none transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 ${
+              hasNote
+                ? "text-[var(--color-mark)] opacity-100"
+                : "opacity-0"
+            }`}
+            title={
+              noteCount > 0
+                ? `Deskripsi & bukti — ${noteCount} entri`
+                : hasNote
+                  ? "Deskripsi & bukti — ada deskripsi"
+                  : "Tambah deskripsi atau bukti"
+            }
+            aria-label="Deskripsi & bukti"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setEvidenceTask(task.id);
+            }}
+          >
+            ✎
           </Button>
           {task.repositoryPath ? (
             <Popover

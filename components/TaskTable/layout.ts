@@ -13,9 +13,9 @@ export type ColKey =
 
 /** Lebar bawaan tiap kolom, dalam px. */
 export const COL: Record<ColKey, number> = {
-  // Pas mengikuti isi: 5 tombol × 12px + 4 sela × 4px + padding sel 12px.
+  // Pas mengikuti isi: 6 tombol × 12px + 5 sela × 4px + padding sel 12px.
   // Tombol tetap mengambil ruang saat transparan agar tabel tidak bergeser.
-  action: 88,
+  action: 104,
   wbs: 92,
   title: 236,
   progress: 92,
@@ -27,7 +27,7 @@ export const COL: Record<ColKey, number> = {
 
 /** Batas bawah supaya kolom tidak bisa diseret sampai isinya tak terbaca. */
 export const COL_MIN: Record<ColKey, number> = {
-  action: 88,
+  action: 104,
   wbs: 56,
   title: 120,
   progress: 72,

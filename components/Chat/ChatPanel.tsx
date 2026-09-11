@@ -2,9 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Send, Sparkles, X } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Button } from "@/components/animate-ui/components/buttons/button";
+import Markdown from "@/components/Markdown";
 import { zeno } from "@/lib/bridge";
 import { useShortcutText } from "@/lib/shortcuts";
 import { useStore } from "@/lib/store";
@@ -206,22 +205,7 @@ export default function ChatPanel() {
                   yang dirender sebagai markdown. react-markdown tidak
                   merender HTML mentah, jadi teks dari model tidak bisa
                   menyuntikkan markup. */}
-              {turn.role === "user" ? (
-                turn.text
-              ) : (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    a: ({ children, ...props }) => (
-                      <a {...props} target="_blank" rel="noreferrer">
-                        {children}
-                      </a>
-                    ),
-                  }}
-                >
-                  {turn.text}
-                </ReactMarkdown>
-              )}
+              {turn.role === "user" ? turn.text : <Markdown>{turn.text}</Markdown>}
               {turn.applied && turn.applied.length > 0 && (
                 <div className="mt-1.5 space-y-0.5 border-t border-[var(--color-line)] pt-1.5 text-[11px] text-[var(--color-ink-soft)]">
                   {turn.applied.map((line, j) => (

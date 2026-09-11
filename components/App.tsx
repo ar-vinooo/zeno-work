@@ -7,6 +7,7 @@ import SummaryView from "./Summary/SummaryView";
 import Toolbar, { type WorkspaceView } from "./Toolbar/Toolbar";
 import ChatPanel from "./Chat/ChatPanel";
 import SettingsDialog from "./Settings/SettingsDialog";
+import EvidenceDialog from "./Evidence/EvidenceDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -356,6 +357,7 @@ export default function App() {
       </div>
 
       <SettingsDialog />
+      <EvidenceDialog />
 
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent

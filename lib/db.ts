@@ -1,23 +1,24 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync, type SQLInputValue } from "node:sqlite";
-import type { Patch, Task } from "./types";
+import type { EvidenceEntry, Patch, Task } from "./types";
 
 // Electron mengisi ZENO_DATA_DIR dengan folder userData milik sistem; skrip
 // baris perintah (tsx scripts/*.ts) tetap memakai ./data.
 //
 // Dihitung saat dipakai, bukan saat modul diimpor: proses utama Electron baru
 // tahu folder userData setelah app.setName(), yang terjadi setelah impor.
-const dataDir = () =>
+export const dataDir = () =>
   process.env.ZENO_DATA_DIR
     ? path.resolve(process.env.ZENO_DATA_DIR)
     : path.join(process.cwd(), "data");
 const dbPath = () => process.env.ZENO_DB ?? path.join(dataDir(), "zeno-work.db");
 const backupDir = () => path.join(dataDir(), "backups");
 
-type Row = Omit<Task, "collapsed" | "rollup"> & {
+type Row = Omit<Task, "collapsed" | "rollup" | "evidence"> & {
   collapsed: number;
   rollup: number;
+  evidence: string;
 };
 
 const SCHEMA = `
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   "collapsed" INTEGER NOT NULL DEFAULT 0,
   "rollup"    INTEGER NOT NULL DEFAULT 1,
   "notes"     TEXT    NOT NULL DEFAULT '',
+  "evidence"  TEXT    NOT NULL DEFAULT '[]',
   "repositoryPath" TEXT NOT NULL DEFAULT '',
   "createdAt" TEXT    NOT NULL,
   "updatedAt" TEXT    NOT NULL
@@ -73,6 +75,8 @@ function open(): DatabaseSync {
     .all() as { name: string }[];
   if (!taskColumns.some((column) => column.name === "repositoryPath"))
     conn.exec(`ALTER TABLE tasks ADD COLUMN "repositoryPath" TEXT NOT NULL DEFAULT ''`);
+  if (!taskColumns.some((column) => column.name === "evidence"))
+    conn.exec(`ALTER TABLE tasks ADD COLUMN "evidence" TEXT NOT NULL DEFAULT '[]'`);
   return conn;
 }
 
@@ -121,19 +125,36 @@ const COLUMNS = [
   "collapsed",
   "rollup",
   "notes",
+  "evidence",
   "repositoryPath",
   "createdAt",
   "updatedAt",
 ] as const;
 
+// Kolom TEXT berisi JSON. Isi yang rusak tidak boleh menjatuhkan seluruh
+// pemuatan task — lebih baik kehilangan satu log bukti daripada semua baris.
+const parseEvidence = (raw: unknown): EvidenceEntry[] => {
+  if (typeof raw !== "string" || raw === "") return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as EvidenceEntry[]) : [];
+  } catch {
+    return [];
+  }
+};
+
 const toTask = (row: Row): Task => ({
   ...row,
   collapsed: !!row.collapsed,
   rollup: !!row.rollup,
+  evidence: parseEvidence(row.evidence),
 });
 
-const toSql = (value: unknown) =>
-  typeof value === "boolean" ? (value ? 1 : 0) : (value as string | number | null);
+const toSql = (value: unknown) => {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (Array.isArray(value)) return JSON.stringify(value);
+  return value as string | number | null;
+};
 
 export function listTasks(): Task[] {
   const rows = getDb()
@@ -157,6 +178,7 @@ function insertTasksWith(db: DatabaseSync, tasks: Task[]): void {
       ...task,
       collapsed: task.collapsed ? 1 : 0,
       rollup: task.rollup ? 1 : 0,
+      evidence: JSON.stringify(task.evidence ?? []),
     });
 }
 

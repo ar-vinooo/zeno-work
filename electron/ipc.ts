@@ -1,6 +1,7 @@
-import { BrowserWindow, dialog, ipcMain } from "electron";
+import { BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { writeFile } from "node:fs/promises";
 import { getRepositoryScan, listTasks } from "../lib/db";
+import { assetPath, attachFiles, readAsset } from "../lib/evidence";
 import { runChat, type ChatMessage } from "../lib/chat";
 import { publicSettings, writeSettings, type Settings } from "../lib/settings";
 import { backupPayload, importTasks, syncTasks, type SyncDiff } from "../lib/sync";
@@ -124,6 +125,23 @@ export function registerIpc(): void {
       content,
     ),
   );
+
+  handle("evidence:attach", async (taskId: string) => {
+    const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0];
+    const options: Electron.OpenDialogOptions = {
+      properties: ["openFile", "multiSelections"],
+    };
+    const result = parent
+      ? await dialog.showOpenDialog(parent, options)
+      : await dialog.showOpenDialog(options);
+    if (result.canceled || result.filePaths.length === 0) return [];
+    return attachFiles(taskId, result.filePaths);
+  });
+  handle("evidence:read", (relPath: string) => readAsset(relPath));
+  handle("evidence:reveal", async (relPath: string) => {
+    const error = await shell.openPath(assetPath(relPath));
+    if (error) throw new Error(error);
+  });
 
   handle("chat:send", (messages: ChatMessage[], tasks: unknown) =>
     runChat(messages ?? [], tasks),

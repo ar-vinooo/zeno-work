@@ -1,6 +1,28 @@
 export type Status = "todo" | "in_progress" | "blocked" | "done";
 export type Priority = "low" | "medium" | "high";
 
+export type EvidenceAssetKind = "file" | "link";
+
+export interface EvidenceAsset {
+  id: string;
+  kind: EvidenceAssetKind;
+  label: string;
+  /** kind "link" = URL apa adanya. kind "file" = path relatif ke data/evidence. */
+  href: string;
+  mime: string;
+  bytes: number;
+}
+
+/** Satu entri catatan/bukti bertanggal milik sebuah task. */
+export interface EvidenceEntry {
+  id: string;
+  at: string; // YYYY-MM-DD
+  body: string;
+  assets: EvidenceAsset[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Baris seperti tersimpan di DB. Nomor WBS TIDAK ada di sini — lihat lib/tree.ts. */
 export interface Task {
   id: string;
@@ -17,6 +39,8 @@ export interface Task {
   /** true = progres & tanggal induk dihitung dari anak (§4.3 PRD). */
   rollup: boolean;
   notes: string;
+  /** Log catatan/bukti. Disimpan sebagai JSON di satu kolom TEXT. */
+  evidence: EvidenceEntry[];
   /** Folder Git lokal milik task ini. Anak mewarisi milik induk saat kosong. */
   repositoryPath: string;
   createdAt: string;

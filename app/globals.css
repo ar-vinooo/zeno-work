@@ -297,6 +297,62 @@ input.bare {
   font-weight: 600;
 }
 
+/* Varian untuk tempat yang lebarnya cukup (modal, dokumen). Panel Asisten
+   tetap memakai .md polos: di lebar 340px heading berukuran penuh justru
+   memecah aliran bacaan. */
+.md-doc h1,
+.md-doc h2,
+.md-doc h3,
+.md-doc h4,
+.md-doc h5,
+.md-doc h6 {
+  margin-block: 0.9em 0.4em;
+  line-height: 1.25;
+}
+.md-doc h1 {
+  font-size: 1.6em;
+}
+.md-doc h2 {
+  font-size: 1.35em;
+}
+.md-doc h3 {
+  font-size: 1.15em;
+}
+.md-doc h4 {
+  font-size: 1em;
+}
+.md-doc h5,
+.md-doc h6 {
+  font-size: 0.92em;
+  color: var(--color-ink-soft);
+}
+.md-doc h1,
+.md-doc h2 {
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: 0.2em;
+}
+.md-doc p,
+.md-doc ul,
+.md-doc ol,
+.md-doc pre,
+.md-doc blockquote,
+.md-doc table {
+  margin-block: 0.6em;
+}
+
+/* Diagram mermaid. Ukurannya ditentukan konfigurasi mermaid (useMaxWidth:false
+   + font dan jarak antar simpul), jadi SVG-nya sudah keluar seukuran isinya.
+   Di sini cukup dibiarkan menggulir kalau ternyata lebih lebar dari wadahnya —
+   JANGAN dipasangi max-width, karena itu justru meregangkan SVG yang lebar
+   intrinsiknya 100% sampai memenuhi layar. */
+.mermaid-box {
+  margin-block: 0.6em;
+  overflow-x: auto;
+}
+.mermaid-box > svg {
+  display: block;
+}
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: var(--font-sans);

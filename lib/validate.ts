@@ -75,6 +75,7 @@ export function sanitizeImport(tasks: Task[]): Task[] {
       parentId,
       repositoryPath:
         typeof t.repositoryPath === "string" ? t.repositoryPath : "",
+      evidence: Array.isArray(t.evidence) ? t.evidence : [],
     };
   });
 }

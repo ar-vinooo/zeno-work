@@ -3,6 +3,7 @@ import path from "node:path";
 import { app, BrowserWindow, dialog, protocol, session } from "electron";
 import { getMeta, insertTasks, listTasks, setMeta, snapshotDaily, closeDb } from "../lib/db";
 import { seedTasks } from "../lib/seed";
+import { sweepOrphans } from "../lib/evidence";
 import { registerIpc } from "./ipc";
 
 app.setName("ZenoWork");
@@ -151,6 +152,13 @@ function prepareData(): void {
     setMeta("seeded", new Date().toISOString());
   }
   snapshotDaily();
+  // Lampiran yang entrinya dibatalkan lewat Discard tidak punya pemilik lagi.
+  // Gagal menyapu bukan alasan untuk membatalkan start-up.
+  try {
+    sweepOrphans();
+  } catch {
+    // biarkan
+  }
 }
 
 app.whenReady().then(async () => {
