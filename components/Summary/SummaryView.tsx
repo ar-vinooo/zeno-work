@@ -36,7 +36,7 @@ const statusStyle: Record<Status, CSSProperties> = {
   },
 };
 
-function countNodes(node: TaskNode) {
+function countNodes(node: TaskNode): { total: number; leaves: number } {
   let total = 1;
   let leaves = node.children.length === 0 ? 1 : 0;
   for (const child of node.children) {
@@ -47,7 +47,7 @@ function countNodes(node: TaskNode) {
   return { total, leaves };
 }
 
-function hasMatch(node: TaskNode, matchedIds: Set<string>) {
+function hasMatch(node: TaskNode, matchedIds: Set<string>): boolean {
   if (matchedIds.has(node.task.id)) return true;
   return node.children.some((child) => hasMatch(child, matchedIds));
 }
