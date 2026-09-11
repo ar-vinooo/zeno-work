@@ -36,10 +36,19 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.13"
+          node-version: "22.x"
           cache: npm
+          cache-dependency-path: package-lock.json
 
-      - run: npm ci
+      - name: Segarkan npm
+        run: npm install -g npm@latest
+
+      - name: Info toolchain
+        run: |
+          node --version
+          npm --version
+
+      - run: npm ci --prefer-offline --no-audit
 
       - name: Build halaman statis
         run: npm run build
