@@ -159,13 +159,15 @@ export default function ChatPanel() {
       <header className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--color-line)] px-3">
         <Sparkles className="size-3.5 text-[var(--color-mark)]" />
         <span className="text-[12px] font-semibold">Asisten</span>
-        <button
-          className="ml-auto text-[var(--color-faint)] hover:text-[var(--color-ink)]"
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="ml-auto size-7 text-[var(--color-faint)] hover:text-[var(--color-ink)]"
           onClick={toggleChat}
           title="Tutup"
         >
           <X className="size-3.5" />
-        </button>
+        </Button>
       </header>
 
       <div className="scroll-pane flex-1 space-y-3 overflow-y-auto p-3 text-[12px]">
@@ -177,13 +179,15 @@ export default function ChatPanel() {
             </p>
             <div className="space-y-1">
               {CONTOH.map((c) => (
-                <button
+                <Button
                   key={c}
-                  className="block w-full rounded border border-[var(--color-line)] px-2 py-1 text-left text-[11px] hover:border-[var(--color-mark)]"
+                  variant="outline"
+                  size="sm"
+                  className="h-auto w-full justify-start whitespace-normal px-2 py-1 text-left text-[11px] hover:border-[var(--color-mark)]"
                   onClick={() => void send(c)}
                 >
                   {c}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

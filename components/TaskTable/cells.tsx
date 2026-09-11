@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Progress, ProgressIndicator } from "@/components/animate-ui/components/radix/progress";
 
 interface EditableProps {
   value: string;
@@ -109,8 +110,9 @@ export function ProgressTrack({ value, readOnly, onChange, children }: ProgressP
   };
 
   return (
-    <div
+    <Progress
       ref={ref}
+      value={value}
       className={`relative h-[7px] w-full overflow-hidden rounded-full ${
         readOnly ? "" : "cursor-ew-resize"
       }`}
@@ -131,10 +133,9 @@ export function ProgressTrack({ value, readOnly, onChange, children }: ProgressP
         window.addEventListener("pointerup", up);
       }}
     >
-      <div
+      <ProgressIndicator
         className="h-full rounded-full"
         style={{
-          width: `${value}%`,
           // Hijau begitu penuh, dan hijaunya PERSIS hijau bar Gantt — dua bar
           // itu berdiri di baris yang sama, jadi keduanya harus warna yang
           // sama. Isian pakai --color-bar; teks dan titik pakai --color-done
@@ -146,6 +147,6 @@ export function ProgressTrack({ value, readOnly, onChange, children }: ProgressP
         }}
       />
       {children}
-    </div>
+    </Progress>
   );
 }

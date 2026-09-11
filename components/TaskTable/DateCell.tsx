@@ -8,7 +8,7 @@ import {
   Popover,
   PopoverAnchor,
   PopoverContent,
-} from "@/components/ui/popover";
+} from "@/components/animate-ui/components/radix/popover";
 import { formatLong, fromISO, parseDateInput, toISO } from "@/lib/dates";
 
 type Seg = "y" | "m" | "d";

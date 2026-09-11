@@ -22,7 +22,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@/components/animate-ui/components/radix/popover";
 import type { RepositorySummary } from "@/lib/repository";
 import { STATUS_LABEL } from "@/lib/types";
 import type { Row, Status } from "@/lib/types";
@@ -215,8 +215,10 @@ function TaskRow({
           className="cell shrink-0 gap-1 text-[11px] text-[var(--color-faint)]"
           style={{ width: widthOf("action") }}
         >
-          <button
-            className="w-3 shrink-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100"
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100"
             title={`Tambah sub-task di dalam baris ini (jadi ${row.wbs}.${
               row.children.length + 1
             })`}
@@ -227,9 +229,11 @@ function TaskRow({
             }}
           >
             ⤷
-          </button>
-          <button
-            className="w-3 shrink-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100"
             title={`Tambah baris setingkat setelah ini (jadi ${row.wbs
               .split(".")
               .slice(0, -1)
@@ -242,9 +246,11 @@ function TaskRow({
             }}
           >
             ⤓
-          </button>
-          <button
-            className="w-3 shrink-0 text-center text-[13px] leading-none opacity-0 transition-opacity hover:text-[var(--color-blocked)] [.row:hover_&]:opacity-100"
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-3 shrink-0 p-0 text-center text-[13px] leading-none opacity-0 transition-opacity hover:text-[var(--color-blocked)] [.row:hover_&]:opacity-100"
             title="Hapus baris ini"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -253,9 +259,11 @@ function TaskRow({
             }}
           >
             ×
-          </button>
-          <button
-            className={`w-3 shrink-0 text-center text-[12px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 ${
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={`size-3 shrink-0 p-0 text-center text-[12px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 ${
               hasChildren ? "" : "invisible pointer-events-none"
             }`}
             title={
@@ -277,7 +285,7 @@ function TaskRow({
             }}
           >
             ◎
-          </button>
+          </Button>
           {task.repositoryPath ? (
             <Popover
               open={repoOpen}
@@ -287,15 +295,17 @@ function TaskRow({
               }}
             >
               <PopoverTrigger asChild>
-                <button
-                  className="w-3 shrink-0 text-center leading-none text-[var(--color-mark)]"
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-3 shrink-0 p-0 text-center leading-none text-[var(--color-mark)]"
                   title={`Git: ${task.repositoryPath}`}
                   aria-label={`Status repository Git untuk ${row.wbs}`}
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <FolderGit2 className="size-3" />
-                </button>
+                </Button>
               </PopoverTrigger>
               <PopoverContent
                 side="right"
@@ -369,8 +379,10 @@ function TaskRow({
               </PopoverContent>
             </Popover>
           ) : (
-            <button
-              className="w-3 shrink-0 text-center leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100"
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-3 shrink-0 p-0 text-center leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100"
               title="Tautkan repository Git ke task ini"
               aria-label={`Tautkan repository Git ke ${row.wbs}`}
               onMouseDown={(e) => e.stopPropagation()}
@@ -380,7 +392,7 @@ function TaskRow({
               }}
             >
               <FolderGit2 className="size-3" />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -389,8 +401,10 @@ function TaskRow({
           className="cell num shrink-0 gap-0.5 border-l border-[var(--color-line)] text-[11px] text-[var(--color-faint)]"
           style={{ width: widthOf("wbs") }}
         >
-          <button
-            className={`w-3 shrink-0 text-center ${hasChildren ? "" : "invisible"}`}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className={`size-3 shrink-0 p-0 text-center ${hasChildren ? "" : "invisible"}`}
             onClick={(e) => {
               e.stopPropagation();
               toggleCollapse(task.id);
@@ -398,7 +412,7 @@ function TaskRow({
             title={task.collapsed ? "Buka sub-task" : "Tutup sub-task"}
           >
             {task.collapsed ? "▸" : "▾"}
-          </button>
+          </Button>
           <span
             className="cursor-grab truncate hover:text-[var(--color-ink)]"
             title="Geser nomor ini untuk memindahkan baris beserta sub-task-nya"

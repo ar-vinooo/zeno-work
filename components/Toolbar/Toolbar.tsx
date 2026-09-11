@@ -401,15 +401,17 @@ export default function Toolbar({
             <span className="truncate">
               Fokus: {focusNode.wbs} {focusNode.task.title}
             </span>
-            <button
+            <Button
               type="button"
-              className="shrink-0 text-[13px] leading-none hover:text-[var(--color-blocked)]"
+              variant="ghost"
+              size="icon-sm"
+              className="size-5 shrink-0 text-[13px] leading-none hover:text-[var(--color-blocked)]"
               title="Keluar dari Fokus Cabang"
               aria-label="Keluar dari Fokus Cabang"
               onClick={() => setFocusRoot(null)}
             >
               ×
-            </button>
+            </Button>
           </div>
         )}
 
@@ -426,15 +428,17 @@ export default function Toolbar({
                 {label}
               </span>
             ))}
-            <button
+            <Button
               type="button"
-              className="shrink-0 text-[var(--color-faint)] hover:text-[var(--color-blocked)]"
+              variant="ghost"
+              size="icon-sm"
+              className="size-5 shrink-0 text-[var(--color-faint)] hover:text-[var(--color-blocked)]"
               title="Reset semua filter"
               aria-label="Reset semua filter"
               onClick={resetFilters}
             >
               ×
-            </button>
+            </Button>
           </div>
         )}
 

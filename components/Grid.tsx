@@ -21,6 +21,7 @@ import { xForDate, type Scale } from "@/lib/schedule";
 import { useStore, type CellRef, type DragMode } from "@/lib/store";
 import { childrenOf, subtreeIds } from "@/lib/tree";
 import type { Row } from "@/lib/types";
+import { Button } from "@/components/animate-ui/components/buttons/button";
 
 interface Props {
   rows: Row[];
@@ -482,12 +483,14 @@ export default function Grid({
                 boxShadow: "inset -1px 0 0 var(--color-line)",
               }}
             >
-              <button
-                className="text-[12px] text-[var(--color-faint)] hover:text-[var(--color-mark)]"
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-[12px] text-[var(--color-faint)] hover:text-[var(--color-mark)]"
                 onClick={() => addSiblingAfter(null)}
               >
                 + tambah task pertama
-              </button>
+              </Button>
             </div>
             <div
               className="shrink-0 border-b border-[var(--color-line)]"

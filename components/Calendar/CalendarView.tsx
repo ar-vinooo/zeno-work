@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { ChevronLeft, ChevronRight, LocateFixed } from "lucide-react";
 import { Button } from "@/components/animate-ui/components/buttons/button";
+import { Checkbox } from "@/components/animate-ui/components/radix/checkbox";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@/components/animate-ui/components/radix/popover";
 import {
   diffDays,
   fromISO,
@@ -151,11 +152,10 @@ export default function CalendarView({
           {visibleNodes.length} task
         </span>
         <label className="ml-auto flex cursor-pointer items-center gap-2 text-[11px] text-[var(--color-ink-soft)]">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={leavesOnly}
-            onChange={(event) => setLeavesOnly(event.target.checked)}
-            className="accent-[var(--color-mark)]"
+            onCheckedChange={(checked) => setLeavesOnly(checked === true)}
+            size="sm"
           />
           Hanya task daun
         </label>
@@ -210,10 +210,12 @@ export default function CalendarView({
               </div>
               <div className="space-y-1">
                 {dayNodes.slice(0, MAX_VISIBLE).map((node) => (
-                  <button
+                  <Button
                     key={node.task.id}
+                    variant="ghost"
+                    size="sm"
                     type="button"
-                    className={`block h-5 w-full truncate rounded border-l-2 px-1.5 text-left text-[10px] leading-5 text-[var(--color-ink)] transition-shadow hover:shadow-sm ${
+                    className={`h-5 w-full justify-start truncate rounded border-l-2 px-1.5 text-left text-[10px] leading-5 text-[var(--color-ink)] transition-shadow hover:shadow-sm ${
                       selectionSet.has(node.task.id)
                         ? "ring-1 ring-[var(--color-mark)] ring-offset-1 ring-offset-[var(--color-surface)]"
                         : ""
@@ -232,18 +234,20 @@ export default function CalendarView({
                       {node.wbs}
                     </span>
                     {node.task.title}
-                  </button>
+                  </Button>
                 ))}
                 {dayNodes.length > MAX_VISIBLE && (
                   <Popover>
                     <PopoverTrigger asChild>
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         type="button"
-                        className="w-full rounded px-1 text-left text-[10px] text-[var(--color-mark)] hover:bg-[var(--color-raised)]"
+                        className="h-5 w-full justify-start rounded px-1 text-left text-[10px] text-[var(--color-mark)] hover:bg-[var(--color-raised)]"
                         title={`Lihat semua task tanggal ${day}`}
                       >
                         +{dayNodes.length - MAX_VISIBLE} lainnya
-                      </button>
+                      </Button>
                     </PopoverTrigger>
                     <PopoverContent
                       align="start"
@@ -258,10 +262,12 @@ export default function CalendarView({
                       </div>
                       <div className="space-y-1">
                         {dayNodes.map((node) => (
-                          <button
+                          <Button
                             key={node.task.id}
+                            variant="ghost"
+                            size="sm"
                             type="button"
-                            className={`block w-full rounded border-l-2 px-2 py-1 text-left transition-colors hover:bg-[var(--color-raised)] ${
+                            className={`h-auto w-full justify-start rounded border-l-2 px-2 py-1 text-left transition-colors hover:bg-[var(--color-raised)] ${
                               selectionSet.has(node.task.id)
                                 ? "ring-1 ring-[var(--color-mark)]"
                                 : ""
@@ -285,7 +291,7 @@ export default function CalendarView({
                             <span className="ml-1 text-[10px] text-[var(--color-ink-soft)]">
                               · {STATUS_LABEL[node.eff.status]}
                             </span>
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </PopoverContent>

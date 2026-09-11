@@ -9,6 +9,10 @@ import {
   DialogTitle,
 } from "@/components/animate-ui/components/radix/dialog";
 import { Button } from "@/components/animate-ui/components/buttons/button";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/animate-ui/components/radix/radio-group";
 import { zeno } from "@/lib/bridge";
 import { useStore } from "@/lib/store";
 import type { AiProvider, PublicSettings } from "@/lib/settings";
@@ -124,7 +128,11 @@ export default function SettingsDialog() {
           <div className="space-y-3">
             <div>
               <span className={label}>Sumber jawaban Asisten</span>
-              <div className="grid grid-cols-3 gap-1.5">
+              <RadioGroup
+                className="grid grid-cols-3 gap-1.5"
+                value={data.aiProvider}
+                onValueChange={(value) => patch({ aiProvider: value as AiProvider })}
+              >
                 {(
                   [
                     ["api", "Kunci API", "Tagihan per token"],
@@ -132,22 +140,22 @@ export default function SettingsDialog() {
                     ["codex-cli", "Codex CLI", "Ikut langganan ChatGPT"],
                   ] as [AiProvider, string, string][]
                 ).map(([id, title, hint]) => (
-                  <button
+                  <label
                     key={id}
-                    onClick={() => patch({ aiProvider: id })}
                     className={`rounded-md border px-2 py-1.5 text-left text-[12px] ${
                       data.aiProvider === id
                         ? "border-[var(--color-mark)] bg-[var(--color-mark-soft)]"
                         : "border-[var(--color-line)]"
                     }`}
                   >
+                    <RadioGroupItem value={id} className="sr-only" />
                     <div className="font-medium">{title}</div>
                     <div className="text-[10px] text-[var(--color-ink-soft)]">
                       {hint}
                     </div>
-                  </button>
+                  </label>
                 ))}
-              </div>
+              </RadioGroup>
             </div>
 
             {/* Urutan sama di semua mode: Model → penalaran → kredensial. */}
