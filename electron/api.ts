@@ -78,7 +78,7 @@ export interface ZenoApi {
     /** Pilih berkas lalu salin ke folder data. Daftar kosong = pengguna membatalkan. */
     attach(taskId: string): Promise<EvidenceAsset[]>;
     /** Isi berkas untuk pratinjau di halaman; dibungkus jadi blob di sana. */
-    read(relPath: string): Promise<Uint8Array>;
+    read(relPath: string): Promise<Uint8Array<ArrayBuffer>>;
     /** Buka lampiran dengan aplikasi bawaan sistem. */
     reveal(relPath: string): Promise<void>;
   };
