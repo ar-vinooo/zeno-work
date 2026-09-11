@@ -40,9 +40,6 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
-      - name: Segarkan npm
-        run: npm install -g npm@latest
-
       - name: Info toolchain
         run: |
           node --version
