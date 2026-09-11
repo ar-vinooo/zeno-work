@@ -45,7 +45,7 @@ jobs:
           node --version
           npm --version
 
-      - run: npm ci --prefer-offline --no-audit
+      - run: npm ci --include=optional --prefer-offline --no-audit
 
       - name: Build halaman statis
         run: npm run build
