@@ -223,7 +223,7 @@ export function makeTask(overrides: Partial<Task> = {}): Task {
     start,
     end: overrides.end ?? start,
     status: "todo",
-    priority: "medium",
+    priority: "none",
     collapsed: false,
     rollup: true,
     notes: "",

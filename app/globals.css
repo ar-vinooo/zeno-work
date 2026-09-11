@@ -77,6 +77,13 @@
   --color-ai: #f1edfa;
   --color-ai-edge: #7c6bb0;
 
+  /* Prioritas. Bentuk panahnya pembeda utama, warna cuma penegas — penanda
+     Tinggi berdiri tepat di sebelah titik status yang juga bisa merah
+     (Blocked), jadi kalau hanya warna yang membedakan keduanya tertukar. */
+  --color-prio-high: #dc2626;
+  --color-prio-medium: #d97706;
+  --color-prio-low: #94a3b8;
+
   --row-h: 32px;
   --indent: 16px;
 
@@ -116,6 +123,10 @@
     --color-bar-track: #22301c;
     --color-row-1: #1c222b;
     --color-row-2: #191e26;
+    --color-prio-high: #f87171;
+    --color-prio-medium: #fbbf24;
+    --color-prio-low: #64748b;
+
     --color-ai: #262234;
     --color-ai-edge: #9d8ed0;
 
@@ -152,6 +163,10 @@
   --color-bar-track: #22301c;
   --color-row-1: #1c222b;
   --color-row-2: #191e26;
+  --color-prio-high: #f87171;
+  --color-prio-medium: #fbbf24;
+  --color-prio-low: #64748b;
+
   --color-ai: #262234;
   --color-ai-edge: #9d8ed0;
 }

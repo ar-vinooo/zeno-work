@@ -10,7 +10,12 @@ import {
 import { durationOf } from "@/lib/dates";
 import { isOverdue } from "@/lib/derive";
 import { useStore } from "@/lib/store";
-import { STATUS_LABEL, type Status, type TaskNode } from "@/lib/types";
+import {
+  PRIORITY_LABEL,
+  STATUS_LABEL,
+  type Status,
+  type TaskNode,
+} from "@/lib/types";
 
 const statusStyle: Record<Status, CSSProperties> = {
   todo: {
@@ -178,8 +183,12 @@ export default function SummaryView({
                     <CircleAlert className="size-3" />
                     Prioritas
                   </div>
-                  <div className="capitalize text-[var(--color-ink)]">
-                    {node.task.priority}
+                  <div className="text-[var(--color-ink)]">
+                    {node.task.priority === "none" ? (
+                      <span className="text-[var(--color-faint)]">—</span>
+                    ) : (
+                      PRIORITY_LABEL[node.task.priority]
+                    )}
                   </div>
                 </div>
               </div>

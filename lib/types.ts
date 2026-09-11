@@ -1,5 +1,7 @@
 export type Status = "todo" | "in_progress" | "blocked" | "done";
-export type Priority = "low" | "medium" | "high";
+/** "none" = belum ditetapkan. Ini bawaan task baru: memaksa semua task ke
+ *  "medium" membuat nilainya tidak pernah berarti apa-apa. */
+export type Priority = "none" | "low" | "medium" | "high";
 
 export type EvidenceAssetKind = "file" | "link";
 
@@ -132,6 +134,7 @@ export const RANGE_LABEL: Record<DateRange, string> = {
 };
 
 export const PRIORITY_LABEL: Record<Priority, string> = {
+  none: "Tanpa prioritas",
   low: "Rendah",
   medium: "Sedang",
   high: "Tinggi",

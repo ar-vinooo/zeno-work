@@ -23,7 +23,7 @@ import { buildOutline } from "./rollup";
 import { MAX_TASKS_PER_CALL, type AiNewTask, type AiOperation } from "./ai";
 import { shiftISO, diffDays } from "./dates";
 import { EMPTY_FILTERS } from "./types";
-import type { EvidenceEntry, Filters, Patch, Task } from "./types";
+import type { Filters, Patch, Task } from "./types";
 import type { ZoomUnit } from "./schedule";
 
 interface Diff {
@@ -207,12 +207,8 @@ interface Store {
   patchTask: (id: string, patch: Omit<Patch, "id">) => void;
   /** Tautan Git sengaja langsung disimpan agar asisten bisa membacanya saat itu juga. */
   setRepositoryPath: (id: string, repositoryPath: string) => Promise<void>;
-  /** Simpan deskripsi & bukti satu task tanpa menyentuh perubahan task lain. */
-  saveEvidence: (
-    id: string,
-    notes: string,
-    evidence: EvidenceEntry[],
-  ) => Promise<void>;
+  /** Simpan SATU task ke database tanpa menyentuh perubahan task lain. */
+  saveTask: (id: string, fields: Omit<Patch, "id">) => Promise<void>;
   addSiblingAfter: (id: string | null) => string;
   addChildOf: (id: string) => string;
   removeSelected: (mode: "cascade" | "promote") => void;
@@ -413,15 +409,16 @@ export const useStore = create<Store>((set, get) => {
     },
 
     /**
-     * Simpan deskripsi & bukti SATU task saja.
+     * Simpan SATU task saja.
      *
      * Tombol Simpan di toolbar mengirim seluruh selisih terhadap baseline, jadi
      * menekannya dari modal akan ikut mendorong perubahan task lain yang masih
-     * sengaja ditahan. Di sini hanya dua kolom milik satu baris yang dikirim,
-     * lalu baseline-nya ditambal setempat supaya hitungan pending sisanya utuh.
+     * sengaja ditahan. Di sini hanya satu baris yang dikirim, lalu baseline-nya
+     * ditambal setempat supaya hitungan pending sisanya utuh.
      */
-    saveEvidence: async (id, notes, evidence) => {
-      if (!indexById(get().tasks).get(id)) return;
+    saveTask: async (id, fields) => {
+      const current = indexById(get().tasks).get(id);
+      if (!current) return;
 
       // Baris yang belum pernah tersimpan tidak punya pasangan di database, dan
       // syncTasks membuang patch untuk id yang tidak dikenalnya — tanpa
@@ -431,7 +428,9 @@ export const useStore = create<Store>((set, get) => {
           "Task ini belum pernah disimpan. Tekan Simpan di toolbar dulu.",
         );
 
-      const patch: Patch = { id, notes, evidence };
+      // Aturan progress↔status dipakai di sini juga, supaya nilai yang kita
+      // tulis ke baseline persis sama dengan yang dihitung proses utama.
+      const patch = applyRules(current, { id, ...fields });
 
       set((s) => ({ saving: s.saving + 1 }));
       try {

@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   "start"     TEXT    NOT NULL,
   "end"       TEXT    NOT NULL,
   "status"    TEXT    NOT NULL DEFAULT 'todo',
-  "priority"  TEXT    NOT NULL DEFAULT 'medium',
+  "priority"  TEXT    NOT NULL DEFAULT 'none',
   "collapsed" INTEGER NOT NULL DEFAULT 0,
   "rollup"    INTEGER NOT NULL DEFAULT 1,
   "notes"     TEXT    NOT NULL DEFAULT '',

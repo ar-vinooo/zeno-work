@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
-import { FolderGit2, RefreshCw, Unlink } from "lucide-react";
+import { ChevronDown, ChevronUp, FolderGit2, Minus, RefreshCw, Unlink } from "lucide-react";
 import { INDENT, ROW_H, widthOf } from "./layout";
 import { Editable, ProgressTrack } from "./cells";
 import DateCell from "./DateCell";
@@ -23,9 +23,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/animate-ui/components/radix/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/animate-ui/components/radix/tooltip";
 import type { RepositorySummary } from "@/lib/repository";
-import { STATUS_LABEL } from "@/lib/types";
-import type { Row, Status } from "@/lib/types";
+import { PRIORITY_LABEL, STATUS_LABEL } from "@/lib/types";
+import type { Priority, Row, Status } from "@/lib/types";
 
 interface Props {
   row: Row;
@@ -72,6 +77,22 @@ const STATUS_PILL: Record<Status, { bg: string; fg: string; dot: string }> = {
     fg: "var(--color-done-ink)",
     dot: "var(--color-done)",
   },
+};
+
+/**
+ * Penanda prioritas. Bentuk panah TETAP jadi pembeda utama dan warna hanya
+ * penegas: penanda Tinggi berdiri tepat di sebelah titik status yang juga bisa
+ * merah (Blocked), jadi kalau cuma warna yang membedakan, keduanya tertukar.
+ * Tooltip yang memastikan artinya tidak perlu dihafal — warnanya dibiarkan
+ * bawaan Animate UI, karena mewarnainya berarti mengubah komponen vendored.
+ *
+ * "none" tidak digambar dan tidak memakan ruang sama sekali — penanda gunanya
+ * menemukan pengecualian, bukan mengumumkan bahwa sesuatu itu biasa saja.
+ */
+const PRIORITY_MARK: Record<Exclude<Priority, "none">, React.ReactNode> = {
+  low: <ChevronDown className="size-3 text-[var(--color-prio-low)]" />,
+  medium: <Minus className="size-3 text-[var(--color-prio-medium)]" />,
+  high: <ChevronUp className="size-3 text-[var(--color-prio-high)]" />,
 };
 
 /**
@@ -196,7 +217,7 @@ function TaskRow({
 
   return (
     <div
-      className="row flex no-select"
+      className={`row flex no-select${selected ? " row-active" : ""}`}
       style={{
         height: ROW_H,
         background,
@@ -213,7 +234,8 @@ function TaskRow({
         }}
         title={aiEdited ? "Diubah asisten AI, belum disimpan" : undefined}
       >
-        {/* Action: tombol baris, muncul saat baris di-hover */}
+        {/* Action: tombol baris, muncul saat baris di-hover atau sedang
+            terpilih — `.row-active` dipasang di pembungkus baris. */}
         <div
           className="cell shrink-0 gap-1 text-[11px] text-[var(--color-faint)]"
           style={{ width: widthOf("action") }}
@@ -221,7 +243,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100"
+            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
             title={`Tambah sub-task di dalam baris ini (jadi ${row.wbs}.${
               row.children.length + 1
             })`}
@@ -236,7 +258,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100"
+            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
             title={`Tambah baris setingkat setelah ini (jadi ${row.wbs
               .split(".")
               .slice(0, -1)
@@ -253,7 +275,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-3 shrink-0 p-0 text-center text-[13px] leading-none opacity-0 transition-opacity hover:text-[var(--color-blocked)] [.row:hover_&]:opacity-100"
+            className="size-3 shrink-0 p-0 text-center text-[13px] leading-none opacity-0 transition-opacity hover:text-[var(--color-blocked)] [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
             title="Hapus baris ini"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -266,7 +288,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className={`size-3 shrink-0 p-0 text-center text-[12px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 ${
+            className={`size-3 shrink-0 p-0 text-center text-[12px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100 ${
               hasChildren ? "" : "invisible pointer-events-none"
             }`}
             title={
@@ -294,7 +316,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className={`size-3 shrink-0 p-0 text-center text-[11px] leading-none transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 ${
+            className={`size-3 shrink-0 p-0 text-center text-[11px] leading-none transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100 ${
               hasNote
                 ? "text-[var(--color-mark)] opacity-100"
                 : "opacity-0"
@@ -411,7 +433,7 @@ function TaskRow({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="size-3 shrink-0 p-0 text-center leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100"
+              className="size-3 shrink-0 p-0 text-center leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
               title="Tautkan repository Git ke task ini"
               aria-label={`Tautkan repository Git ke ${row.wbs}`}
               onMouseDown={(e) => e.stopPropagation()}
@@ -464,6 +486,20 @@ function TaskRow({
               className="h-1.5 w-1.5 shrink-0 rounded-full"
               style={{ background: STATUS_PILL[display.status].dot }}
             />
+            {task.priority !== "none" && (
+              // Komponen ini default delayDuration 0. Di tabel sepadat ini
+              // tooltip akan meletup tiap kali kursor menyapu baris.
+              <Tooltip delayDuration={400}>
+                <TooltipTrigger asChild>
+                  <span className="flex shrink-0 cursor-default">
+                    {PRIORITY_MARK[task.priority]}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-[11px]">
+                  Prioritas {PRIORITY_LABEL[task.priority]}
+                </TooltipContent>
+              </Tooltip>
+            )}
             <Editable
               value={task.title}
               editing={cell("title")}

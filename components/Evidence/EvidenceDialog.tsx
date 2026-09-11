@@ -10,6 +10,8 @@ import {
 import {
   CalendarRange,
   Check,
+  ChevronDown,
+  CircleAlert,
   ExternalLink,
   Link2,
   Paperclip,
@@ -24,6 +26,13 @@ import {
   DialogTitle,
 } from "@/components/animate-ui/components/radix/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/animate-ui/components/radix/dropdown-menu";
+import {
   Progress,
   ProgressIndicator,
 } from "@/components/animate-ui/components/radix/progress";
@@ -35,12 +44,15 @@ import { isOverdue } from "@/lib/derive";
 import { buildOutline } from "@/lib/rollup";
 import { useStore } from "@/lib/store";
 import { newId } from "@/lib/tree";
+import { applyRules } from "@/lib/validate";
 import {
   PRIORITY_LABEL,
   STATUS_LABEL,
   type EvidenceAsset,
   type EvidenceEntry,
+  type Priority,
   type Status,
+  type Task,
 } from "@/lib/types";
 
 const statusStyle: Record<Status, CSSProperties> = {
@@ -67,6 +79,63 @@ const field =
 const label = "mb-1 block text-[11px] font-medium text-[var(--color-ink-soft)]";
 const area =
   "w-full resize-none rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1.5 text-[12px] outline-none focus:border-[var(--color-mark)]";
+const box = "rounded-md bg-[var(--color-raised)] px-2 py-1.5";
+const boxLabel =
+  "mb-1 flex items-center gap-1 text-[10px] font-medium text-[var(--color-faint)]";
+
+const ROLLUP_HINT = "Dihitung dari sub-task";
+
+/**
+ * Animate UI tidak punya komponen Select. Padanan resminya untuk pilihan
+ * tunggal adalah DropdownMenu + RadioGroup, jadi itu yang dipakai di sini
+ * ketimbang <select> bawaan yang tampilannya lepas dari komponen lain.
+ *
+ * Tabel sengaja TIDAK ikut: docs/PRD.md:540 melarang Animate UI di dalam baris
+ * tabel karena satu komponen Motion per baris memberatkan scroll dan drag.
+ */
+function Picker<T extends string>({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  value: T;
+  options: Record<T, string>;
+  onChange: (next: T) => void;
+  ariaLabel: string;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={ariaLabel}
+          className="h-8 w-full justify-between px-2 text-[12px] font-normal"
+        >
+          <span className="truncate">{options[value]}</span>
+          <ChevronDown className="size-3 shrink-0 text-[var(--color-faint)]" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="start"
+        className="min-w-[var(--radix-dropdown-menu-trigger-width)]"
+      >
+        <DropdownMenuRadioGroup
+          value={value}
+          onValueChange={(next) => onChange(next as T)}
+        >
+          {(Object.keys(options) as T[]).map((key) => (
+            <DropdownMenuRadioItem key={key} value={key} className="text-[12px]">
+              {options[key]}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 const formatBytes = (n: number) =>
   n >= 1_048_576
@@ -198,11 +267,36 @@ function MarkdownField({
   );
 }
 
-/** Salinan kerja modal: hanya dua kolom yang memang dimiliki modal ini. */
+/** Salinan kerja modal: seluruh kolom task yang bisa disunting dari sini. */
 interface Draft {
   notes: string;
   evidence: EvidenceEntry[];
+  status: Status;
+  priority: Priority;
+  progress: number;
+  start: string;
+  end: string;
 }
+
+const DRAFT_FIELDS: (keyof Draft)[] = [
+  "notes",
+  "evidence",
+  "status",
+  "priority",
+  "progress",
+  "start",
+  "end",
+];
+
+const pickDraft = (t: Task): Draft => ({
+  notes: t.notes,
+  evidence: t.evidence,
+  status: t.status,
+  priority: t.priority,
+  progress: t.progress,
+  start: t.start,
+  end: t.end,
+});
 
 /** Terbaru di atas; entri pada tanggal sama diurut dari yang paling akhir dibuat. */
 const byNewest = (a: EvidenceEntry, b: EvidenceEntry) =>
@@ -243,7 +337,7 @@ export default function EvidenceDialog() {
       taskId
         ? (() => {
             const t = useStore.getState().tasks.find((x) => x.id === taskId);
-            return t ? { notes: t.notes, evidence: t.evidence } : null;
+            return t ? pickDraft(t) : null;
           })()
         : null,
     );
@@ -261,10 +355,19 @@ export default function EvidenceDialog() {
   const dirty =
     !!task &&
     !!local &&
-    (local.notes !== task.notes ||
-      JSON.stringify(local.evidence) !== JSON.stringify(task.evidence));
+    DRAFT_FIELDS.some((key) =>
+      key === "evidence"
+        ? JSON.stringify(local.evidence) !== JSON.stringify(task.evidence)
+        : local[key] !== task[key],
+    );
 
   if (!task || !local) return null;
+
+  // Induk ber-roll-up: progress dan tanggalnya dihitung dari anak, jadi
+  // read-only di sini persis seperti di tabel. Yang ditampilkan pun nilai
+  // hasil hitungan itu, bukan nilai mentah yang tersimpan di barisnya.
+  const derived = node?.derived ?? false;
+  const shown = derived && node ? node.eff : local;
 
   const discard = () => setEvidenceTask(null);
 
@@ -272,10 +375,12 @@ export default function EvidenceDialog() {
   // dilakukan di sini juga — kalau tidak, ketikan terakhir ikut hilang.
   const close = () => {
     const next = commitBody(commitNote(local));
-    if (
-      next.notes !== task.notes ||
-      JSON.stringify(next.evidence) !== JSON.stringify(task.evidence)
-    ) {
+    const changed = DRAFT_FIELDS.some((key) =>
+      key === "evidence"
+        ? JSON.stringify(next.evidence) !== JSON.stringify(task.evidence)
+        : next[key] !== task[key],
+    );
+    if (changed) {
       setLocal(next);
       setConfirmClose(true);
       return;
@@ -285,6 +390,16 @@ export default function EvidenceDialog() {
 
   const mutate = (fn: (list: EvidenceEntry[]) => EvidenceEntry[]) =>
     setLocal((l) => (l ? { ...l, evidence: fn(l.evidence) } : l));
+
+  // applyRules dipakai persis seperti di tabel, jadi mengetik progress 100
+  // tetap menaikkan status ke Done dan end tidak pernah mendahului start.
+  const setField = (patch: Partial<Draft>) =>
+    setLocal((l) => {
+      if (!l) return l;
+      const ruled = applyRules({ ...task, ...l }, { id: task.id, ...patch });
+      const { id: _id, ...fields } = ruled;
+      return { ...l, ...(fields as Partial<Draft>) };
+    });
 
   const updateEntry = (id: string, patch: Partial<EvidenceEntry>) =>
     mutate((list) =>
@@ -404,9 +519,7 @@ export default function EvidenceDialog() {
     setBodyDraft(null);
     setBusy(true);
     try {
-      await useStore
-        .getState()
-        .saveEvidence(task.id, next.notes, next.evidence);
+      await useStore.getState().saveTask(task.id, next);
       setConfirmClose(false);
       return true;
     } catch (e) {
@@ -433,58 +546,131 @@ export default function EvidenceDialog() {
           </DialogDescription>
 
           <div className="flex items-start gap-3">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--color-raised)] font-mono text-[13px] font-semibold text-[var(--color-mark)]">
+            {/* Kotak 36px muat "1.2" tapi jebol di "11.1.1" — dan dengan 14
+                task akar serta ribuan sub-task, WBS sepanjang itu biasa saja.
+                min-w menjaga bentuk bujur sangkarnya untuk nomor pendek,
+                padding yang membiarkannya memanjang saat nomornya tumbuh. */}
+            <div className="num flex h-9 min-w-9 shrink-0 items-center justify-center whitespace-nowrap rounded-md bg-[var(--color-raised)] px-1.5 font-mono text-[13px] font-semibold text-[var(--color-mark)]">
               {node?.wbs}
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-[14px] font-semibold leading-5 text-[var(--color-ink)]">
                 {task.title || "Tanpa judul"}
               </div>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                {node && (
-                  <span
-                    className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-                    style={statusStyle[node.eff.status]}
-                  >
-                    {STATUS_LABEL[node.eff.status]}
-                  </span>
-                )}
-                {node && isOverdue(node.eff) && (
-                  <span className="rounded bg-[var(--color-blocked-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-blocked-ink)]">
-                    Overdue
-                  </span>
-                )}
-                <span className="rounded bg-[var(--color-raised)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-ink-soft)]">
-                  {PRIORITY_LABEL[task.priority]}
+              {node && isOverdue(node.eff) && (
+                <span className="mt-1 inline-block rounded bg-[var(--color-blocked-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-blocked-ink)]">
+                  Overdue
                 </span>
-              </div>
+              )}
             </div>
           </div>
 
-          {node && (
-            <div className="mt-3">
-              <div className="mb-1 flex items-end justify-between">
-                <span className="flex items-center gap-1 text-[11px] text-[var(--color-ink-soft)]">
-                  <CalendarRange className="size-3" />
-                  <span className="num">
-                    {node.eff.start} → {node.eff.end}
-                  </span>
-                  <span className="text-[var(--color-faint)]">
-                    · {durationOf(node.eff.start, node.eff.end)} hari
-                  </span>
+          {/* Tiap kontrol membawa judulnya sendiri. Nilai seperti "Sedang"
+              mustahil ditebak artinya kalau berdiri sendiri sebagai pil. */}
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className={box}>
+              <span className={boxLabel}>Status</span>
+              {derived ? (
+                <span
+                  className="inline-flex rounded px-1.5 py-0.5 text-[11px] font-medium"
+                  style={statusStyle[shown.status]}
+                  title={ROLLUP_HINT}
+                >
+                  {STATUS_LABEL[shown.status]}
                 </span>
-                <span className="num text-[16px] font-semibold leading-none text-[var(--color-ink)]">
-                  {node.eff.progress}%
-                </span>
-              </div>
-              <Progress
-                value={node.eff.progress}
-                className="h-1.5 bg-[var(--color-bar-track)]"
-              >
-                <ProgressIndicator className="bg-[var(--color-bar)]" />
-              </Progress>
+              ) : (
+                <Picker<Status>
+                  value={local.status}
+                  options={STATUS_LABEL}
+                  ariaLabel="Status"
+                  onChange={(status) => setField({ status })}
+                />
+              )}
             </div>
-          )}
+
+            <div className={box}>
+              <span className={boxLabel}>
+                <CircleAlert className="size-3" />
+                Prioritas
+              </span>
+              <Picker<Priority>
+                value={local.priority}
+                options={PRIORITY_LABEL}
+                ariaLabel="Prioritas"
+                onChange={(priority) => setField({ priority })}
+              />
+            </div>
+
+            <div className={box}>
+              <span className={boxLabel}>Progress</span>
+              {derived ? (
+                <span className="num text-[13px] font-semibold" title={ROLLUP_HINT}>
+                  {shown.progress}%
+                </span>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    className={`${field} num w-16`}
+                    value={local.progress}
+                    onChange={(e) =>
+                      setField({ progress: Number(e.target.value) })
+                    }
+                  />
+                  <span className="text-[11px] text-[var(--color-faint)]">%</span>
+                </div>
+              )}
+            </div>
+
+            <div className={box}>
+              <span className={boxLabel}>
+                <CalendarRange className="size-3" />
+                Jadwal
+              </span>
+              {derived ? (
+                <span className="num text-[11px]" title={ROLLUP_HINT}>
+                  {shown.start} → {shown.end}
+                </span>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="date"
+                    className={`${field} num w-full`}
+                    value={local.start}
+                    onChange={(e) =>
+                      e.target.value && setField({ start: e.target.value })
+                    }
+                  />
+                  <input
+                    type="date"
+                    className={`${field} num w-full`}
+                    value={local.end}
+                    onChange={(e) =>
+                      e.target.value && setField({ end: e.target.value })
+                    }
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-2">
+            <div className="mb-1 flex items-center justify-between text-[11px] text-[var(--color-ink-soft)]">
+              <span>{durationOf(shown.start, shown.end)} hari</span>
+              <span className="num font-semibold text-[var(--color-ink)]">
+                {shown.progress}%
+              </span>
+            </div>
+            <Progress
+              value={shown.progress}
+              className="h-1.5 bg-[var(--color-bar-track)]"
+            >
+              <ProgressIndicator className="bg-[var(--color-bar)]" />
+            </Progress>
+          </div>
+
         </DialogHeader>
 
         <div className="scroll-pane max-h-[68vh] space-y-4 overflow-y-auto pr-1">
@@ -739,7 +925,7 @@ export default function EvidenceDialog() {
           <div className="flex items-center justify-between gap-3">
             <span className="text-[11px] text-[var(--color-faint)]">
               {dirty
-                ? "Belum disimpan. Tombol ini hanya menulis task ini, tidak menyentuh perubahan task lain."
+                ? "Belum disimpan. Perubahan di sini baru muncul di tabel setelah disimpan, dan hanya task ini yang ditulis."
                 : "Tersimpan."}
             </span>
             <Button

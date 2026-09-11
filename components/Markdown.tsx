@@ -1,7 +1,13 @@
 "use client";
 
-import { isValidElement, useEffect, useState, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import {
+  isValidElement,
+  memo,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 /**
@@ -136,29 +142,44 @@ function mermaidSource(children: ReactNode): string | null {
  * Styling datang dari kelas global `.md` di app/globals.css — pemanggil yang
  * memasangnya pada elemen pembungkus.
  */
-export default function Markdown({ children }: { children: string }) {
+/**
+ * Ditaruh di lingkup modul, BUKAN di dalam render.
+ *
+ * Sebagai literal di dalam komponen, tiap render menghasilkan fungsi baru.
+ * React membaca identitas fungsi sebagai tipe elemen, jadi tipe yang berubah
+ * membuat seluruh pohon markdown di-unmount lalu dipasang ulang — diagram
+ * mermaid kehilangan SVG-nya dan memuat lagi dari nol, terlihat seperti
+ * halaman yang berkedip tiap kali ada state lain yang berubah.
+ */
+const REMARK_PLUGINS = [remarkGfm];
+
+const COMPONENTS: Components = {
+  a: ({ children, ...props }) => (
+    <a {...props} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  ),
+  // Diagram menggantikan seluruh <pre>, bukan hanya <code> di dalamnya —
+  // kalau tidak, latar abu blok kode ikut membingkai diagramnya.
+  pre: ({ children, ...props }) => {
+    const source = mermaidSource(children);
+    return source !== null ? (
+      <MermaidBlock code={source} />
+    ) : (
+      <pre {...props}>{children}</pre>
+    );
+  },
+};
+
+function Markdown({ children }: { children: string }) {
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      components={{
-        a: ({ children: inner, ...props }) => (
-          <a {...props} target="_blank" rel="noreferrer">
-            {inner}
-          </a>
-        ),
-        // Diagram menggantikan seluruh <pre>, bukan hanya <code> di dalamnya —
-        // kalau tidak, latar abu blok kode ikut membingkai diagramnya.
-        pre: ({ children: inner, ...props }) => {
-          const source = mermaidSource(inner);
-          return source !== null ? (
-            <MermaidBlock code={source} />
-          ) : (
-            <pre {...props}>{inner}</pre>
-          );
-        },
-      }}
-    >
+    <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={COMPONENTS}>
       {children}
     </ReactMarkdown>
   );
 }
+
+// Teks yang dirender jarang berubah, sementara induknya ikut render tiap kali
+// field lain disentuh. Tanpa memo, mengubah prioritas memaksa seluruh markdown
+// diparse ulang.
+export default memo(Markdown);
