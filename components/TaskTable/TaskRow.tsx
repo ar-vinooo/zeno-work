@@ -243,7 +243,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
+            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:ring-0 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
             title={`Tambah sub-task di dalam baris ini (jadi ${row.wbs}.${
               row.children.length + 1
             })`}
@@ -258,7 +258,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
+            className="size-3 shrink-0 p-0 text-center text-[11px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:ring-0 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
             title={`Tambah baris setingkat setelah ini (jadi ${row.wbs
               .split(".")
               .slice(0, -1)
@@ -275,7 +275,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className="size-3 shrink-0 p-0 text-center text-[13px] leading-none opacity-0 transition-opacity hover:text-[var(--color-blocked)] [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
+            className="size-3 shrink-0 p-0 text-center text-[13px] leading-none opacity-0 transition-opacity hover:text-[var(--color-blocked)] focus-visible:ring-0 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
             title="Hapus baris ini"
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
@@ -288,7 +288,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className={`size-3 shrink-0 p-0 text-center text-[12px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100 ${
+            className={`size-3 shrink-0 p-0 text-center text-[12px] leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 focus-visible:ring-0 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100 ${
               hasChildren ? "" : "invisible pointer-events-none"
             }`}
             title={
@@ -316,7 +316,7 @@ function TaskRow({
           <Button
             variant="ghost"
             size="icon-sm"
-            className={`size-3 shrink-0 p-0 text-center text-[11px] leading-none transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100 ${
+            className={`size-3 shrink-0 p-0 text-center text-[11px] leading-none transition-opacity hover:text-[var(--color-mark)] focus-visible:opacity-100 focus-visible:ring-0 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100 ${
               hasNote
                 ? "text-[var(--color-mark)] opacity-100"
                 : "opacity-0"
@@ -433,7 +433,7 @@ function TaskRow({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="size-3 shrink-0 p-0 text-center leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
+              className="size-3 shrink-0 p-0 text-center leading-none opacity-0 transition-opacity hover:text-[var(--color-mark)] focus-visible:ring-0 [.row:hover_&]:opacity-100 [.row-active_&]:opacity-100"
               title="Tautkan repository Git ke task ini"
               aria-label={`Tautkan repository Git ke ${row.wbs}`}
               onMouseDown={(e) => e.stopPropagation()}
