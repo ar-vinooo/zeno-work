@@ -7,11 +7,6 @@ import {
   Progress,
   ProgressIndicator,
 } from "@/components/animate-ui/components/radix/progress";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/animate-ui/components/radix/tooltip";
 import { durationOf } from "@/lib/dates";
 import { isOverdue } from "@/lib/derive";
 import { useStore } from "@/lib/store";
@@ -93,118 +88,102 @@ export default function SummaryView({
           const count = countNodes(node);
           const overdue = isOverdue(node.eff);
           return (
-            <Tooltip key={node.task.id} delayDuration={250}>
-              <TooltipTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className={`flex h-auto min-h-44 w-full flex-col items-stretch justify-start gap-0 whitespace-normal rounded-lg border bg-[var(--color-surface)] p-3 text-left shadow-sm transition hover:border-[var(--color-mark)] hover:bg-[var(--color-surface)] hover:shadow border-[var(--color-line)]`}
-                  onClick={() => {
-                    select(node.task.id, "replace");
-                    onFocusTask(node.task.id);
-                  }}
-                >
-                  <div className="mb-3 flex items-start gap-3">
-                    <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--color-raised)] font-mono text-[13px] font-semibold text-[var(--color-mark)]">
-                      {node.wbs}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="max-h-10 overflow-hidden text-[14px] font-semibold leading-5 text-[var(--color-ink)]">
-                        {node.task.title}
-                      </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        <span
-                          className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-                          style={statusStyle[node.eff.status]}
-                        >
-                          {STATUS_LABEL[node.eff.status]}
-                        </span>
-                        {overdue && (
-                          <span className="rounded bg-[var(--color-blocked-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-blocked-ink)]">
-                            Overdue
-                          </span>
-                        )}
-                      </div>
-                    </div>
+            <Button
+              key={node.task.id}
+              type="button"
+              variant="ghost"
+              className={`flex h-auto min-h-44 w-full flex-col items-stretch justify-start gap-0 whitespace-normal rounded-lg border bg-[var(--color-surface)] p-3 text-left shadow-sm transition hover:border-[var(--color-mark)] hover:bg-[var(--color-surface)] hover:shadow border-[var(--color-line)]`}
+              onClick={() => {
+                select(node.task.id, "replace");
+                onFocusTask(node.task.id);
+              }}
+            >
+              <div className="mb-3 flex items-start gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-[var(--color-raised)] font-mono text-[13px] font-semibold text-[var(--color-mark)]">
+                  {node.wbs}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="max-h-10 overflow-hidden text-[14px] font-semibold leading-5 text-[var(--color-ink)]">
+                    {node.task.title}
                   </div>
-
-                  <div className="mb-3">
-                    <div className="mb-1 flex items-end justify-between">
-                      <span className="text-[11px] text-[var(--color-ink-soft)]">
-                        Progress
-                      </span>
-                      <span className="font-mono text-[24px] font-semibold leading-none text-[var(--color-ink)]">
-                        {node.eff.progress}%
-                      </span>
-                    </div>
-                    <Progress
-                      value={node.eff.progress}
-                      className="h-2 bg-[var(--color-bar-track)]"
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span
+                      className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+                      style={statusStyle[node.eff.status]}
                     >
-                      <ProgressIndicator className="bg-[var(--color-bar)]" />
-                    </Progress>
+                      {STATUS_LABEL[node.eff.status]}
+                    </span>
+                    {overdue && (
+                      <span className="rounded bg-[var(--color-blocked-soft)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-blocked-ink)]">
+                        Overdue
+                      </span>
+                    )}
                   </div>
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--color-ink-soft)]">
-                    <div className="rounded-md bg-[var(--color-raised)] px-2 py-1.5">
-                      <div className="mb-0.5 flex items-center gap-1 text-[var(--color-faint)]">
-                        <CalendarRange className="size-3" />
-                        Jadwal
-                      </div>
-                      <div className="font-mono text-[10px] text-[var(--color-ink)]">
-                        {node.eff.start}
-                      </div>
-                      <div className="font-mono text-[10px] text-[var(--color-ink)]">
-                        {node.eff.end}
-                      </div>
-                    </div>
-                    <div className="rounded-md bg-[var(--color-raised)] px-2 py-1.5">
-                      <div className="mb-0.5 flex items-center gap-1 text-[var(--color-faint)]">
-                        <Layers3 className="size-3" />
-                        Isi
-                      </div>
-                      <div className="text-[var(--color-ink)]">
-                        {count.total - 1} sub-task
-                      </div>
-                      <div className="text-[var(--color-ink)]">
-                        {count.leaves} daun
-                      </div>
-                    </div>
-                    <div className="rounded-md bg-[var(--color-raised)] px-2 py-1.5">
-                      <div className="mb-0.5 flex items-center gap-1 text-[var(--color-faint)]">
-                        <CheckCircle2 className="size-3" />
-                        Durasi
-                      </div>
-                      <div className="font-mono text-[var(--color-ink)]">
-                        {durationOf(node.eff.start, node.eff.end)} hari
-                      </div>
-                    </div>
-                    <div className="rounded-md bg-[var(--color-raised)] px-2 py-1.5">
-                      <div className="mb-0.5 flex items-center gap-1 text-[var(--color-faint)]">
-                        <CircleAlert className="size-3" />
-                        Prioritas
-                      </div>
-                      <div className="capitalize text-[var(--color-ink)]">
-                        {node.task.priority}
-                      </div>
-                    </div>
+              <div className="mb-3">
+                <div className="mb-1 flex items-end justify-between">
+                  <span className="text-[11px] text-[var(--color-ink-soft)]">
+                    Progress
+                  </span>
+                  <span className="font-mono text-[24px] font-semibold leading-none text-[var(--color-ink)]">
+                    {node.eff.progress}%
+                  </span>
+                </div>
+                <Progress
+                  value={node.eff.progress}
+                  className="h-2 bg-[var(--color-bar-track)]"
+                >
+                  <ProgressIndicator className="bg-[var(--color-bar)]" />
+                </Progress>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-[11px] text-[var(--color-ink-soft)]">
+                <div className="rounded-md bg-[var(--color-raised)] px-2 py-1.5">
+                  <div className="mb-0.5 flex items-center gap-1 text-[var(--color-faint)]">
+                    <CalendarRange className="size-3" />
+                    Jadwal
                   </div>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent
-                side="top"
-                className="max-w-72 bg-[var(--color-ink)] text-[var(--color-surface)]"
-              >
-                <div className="font-mono text-[10px]">{node.wbs}</div>
-                <div className="text-[11px]">
-                  Klik untuk fokus cabang ini di tabel.
+                  <div className="font-mono text-[10px] text-[var(--color-ink)]">
+                    {node.eff.start}
+                  </div>
+                  <div className="font-mono text-[10px] text-[var(--color-ink)]">
+                    {node.eff.end}
+                  </div>
                 </div>
-                <div className="mt-1 text-[10px] opacity-80">
-                  {STATUS_LABEL[node.eff.status]} · {node.eff.start} sampai{" "}
-                  {node.eff.end}
+                <div className="rounded-md bg-[var(--color-raised)] px-2 py-1.5">
+                  <div className="mb-0.5 flex items-center gap-1 text-[var(--color-faint)]">
+                    <Layers3 className="size-3" />
+                    Isi
+                  </div>
+                  <div className="text-[var(--color-ink)]">
+                    {count.total - 1} sub-task
+                  </div>
+                  <div className="text-[var(--color-ink)]">
+                    {count.leaves} daun
+                  </div>
                 </div>
-              </TooltipContent>
-            </Tooltip>
+                <div className="rounded-md bg-[var(--color-raised)] px-2 py-1.5">
+                  <div className="mb-0.5 flex items-center gap-1 text-[var(--color-faint)]">
+                    <CheckCircle2 className="size-3" />
+                    Durasi
+                  </div>
+                  <div className="font-mono text-[var(--color-ink)]">
+                    {durationOf(node.eff.start, node.eff.end)} hari
+                  </div>
+                </div>
+                <div className="rounded-md bg-[var(--color-raised)] px-2 py-1.5">
+                  <div className="mb-0.5 flex items-center gap-1 text-[var(--color-faint)]">
+                    <CircleAlert className="size-3" />
+                    Prioritas
+                  </div>
+                  <div className="capitalize text-[var(--color-ink)]">
+                    {node.task.priority}
+                  </div>
+                </div>
+              </div>
+            </Button>
           );
         })}
       </div>

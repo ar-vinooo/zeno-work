@@ -267,7 +267,7 @@ export default function CalendarView({
                             variant="ghost"
                             size="sm"
                             type="button"
-                            className={`h-auto w-full justify-start rounded border-l-2 px-2 py-1 text-left transition-colors hover:bg-[var(--color-raised)] ${
+                            className={`h-auto w-full items-start justify-start whitespace-normal rounded border-l-2 px-2 py-1 text-left transition-colors hover:bg-[var(--color-raised)] ${
                               selectionSet.has(node.task.id)
                                 ? "ring-1 ring-[var(--color-mark)]"
                                 : ""
@@ -284,11 +284,13 @@ export default function CalendarView({
                             }
                             onDoubleClick={onOpenTable}
                           >
-                            <span className="mr-1 font-mono text-[10px] opacity-60">
+                            <span className="mr-1 shrink-0 font-mono text-[10px] opacity-60">
                               {node.wbs}
                             </span>
-                            {node.task.title}
-                            <span className="ml-1 text-[10px] text-[var(--color-ink-soft)]">
+                            <span className="min-w-0 flex-1 break-words">
+                              {node.task.title}
+                            </span>
+                            <span className="ml-1 shrink-0 text-[10px] text-[var(--color-ink-soft)]">
                               · {STATUS_LABEL[node.eff.status]}
                             </span>
                           </Button>
