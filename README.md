@@ -1,88 +1,175 @@
 # ZenoWork
 
-Manajemen pekerjaan personal: tabel WBS bertingkat + timeline yang bisa di-drag.
-Aplikasi desktop single-user, jalan lokal, **tanpa login dan tanpa server**.
+ZenoWork adalah aplikasi desktop untuk mengelola pekerjaan personal dengan gaya
+WBS, timeline, dan kalender. Semua data berjalan lokal di komputer kamu:
+tanpa login, tanpa server, dan tanpa memindahkan daftar pekerjaan ke layanan
+cloud.
 
-Spesifikasi lengkap ada di [docs/PRD.md](docs/PRD.md).
+Cocok untuk kamu yang ingin memecah pekerjaan besar menjadi sub-task, melihat
+jadwalnya di satu garis waktu, lalu menyimpan perubahan hanya ketika sudah
+yakin.
 
-## Menjalankan
+## Kenapa ZenoWork?
+
+- **WBS bertingkat**: task otomatis bernomor seperti `1`, `1.1`, `1.1.1`, dan
+  tetap rapi saat baris dipindah, disisipkan, atau dihapus.
+- **Timeline interaktif**: geser bar untuk memindahkan jadwal, tarik ujung bar
+  untuk mengubah durasi, dan lihat garis hari ini sebagai patokan.
+- **Kalender bulanan**: lihat pekerjaan berdasarkan tanggal, buka daftar task
+  yang menumpuk dalam satu hari, dan lompat cepat ke hari ini.
+- **Edit cepat ala spreadsheet**: Enter untuk simpan sel, Esc untuk batal, Tab
+  untuk pindah kolom.
+- **Simpan eksplisit**: perubahan ditahan dulu di memori. Data permanen baru
+  berubah ketika tombol **Simpan** ditekan.
+- **Undo dan redo**: satu drag atau satu edit menjadi satu langkah yang bisa
+  dibatalkan.
+- **Backup portabel**: export/import JSON untuk pindah perangkat, plus export
+  CSV, Markdown, dan XLSX.
+- **Asisten AI lokal-terkendali**: AI membaca snapshot task untuk memberi usulan,
+  tetapi database tetap hanya berubah saat kamu menyimpan.
+- **Konteks Git read-only**: hubungkan task ke repository lokal agar AI bisa
+  membaca status branch/diff secara terbatas tanpa menulis ke repo.
+
+## Cara Install
+
+Ambil installer terbaru dari halaman **Releases** repository ini.
+
+- **macOS**: gunakan file `.dmg`, lalu seret `ZenoWork.app` ke Applications.
+- **Windows**: gunakan installer `.exe` atau versi portable bila tersedia.
+
+Build macOS dari GitHub Actions saat ini tidak ditandatangani dengan sertifikat
+Apple Developer ID. Jika macOS menolak membuka aplikasi pertama kali, lepaskan
+quarantine sekali:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/ZenoWork.app
+```
+
+## Cara Pakai
+
+1. Buka ZenoWork dari aplikasi desktop.
+2. Tambah task baru dengan tombol tambah atau pintasan `N`.
+3. Buat sub-task dengan `Shift+N`, tombol sub-task, atau indent.
+4. Isi judul, tanggal mulai, tanggal selesai, progress, status, dan prioritas.
+5. Geser bar timeline untuk mengatur jadwal secara visual.
+6. Pakai tab **Kalender** untuk melihat pekerjaan per tanggal.
+7. Tekan **Simpan** atau `Cmd/Ctrl+S` ketika perubahan sudah benar.
+
+ZenoWork sengaja tidak bisa dipakai dari browser biasa. Renderer berjalan di
+dalam Electron dan berkomunikasi dengan database lewat IPC desktop.
+
+## Fitur Utama
+
+### Tabel WBS
+
+Tabel utama dirancang seperti lembar kerja proyek: ringkas, cepat diedit, dan
+tetap menjaga struktur hierarki. Parent task menghitung sendiri rentang tanggal,
+progress, dan status dari sub-task-nya, sehingga baris ringkasan tidak perlu
+diisi manual.
+
+### Timeline
+
+Timeline menampilkan setiap task sebagai bar horizontal. Kamu bisa:
+
+- menggeser jadwal tanpa mengubah durasi,
+- menarik ujung kiri/kanan untuk mengubah tanggal,
+- memindahkan seluruh sub-tree saat parent digeser,
+- zoom ke Hari, Minggu, atau Bulan,
+- melihat weekend dan posisi hari ini.
+
+### Kalender
+
+View kalender membantu melihat task yang aktif pada tanggal tertentu. Opsi
+**Hanya task daun** membuat kalender lebih fokus ke pekerjaan yang benar-benar
+dikerjakan, bukan parent ringkasan.
+
+### AI Assistant
+
+Panel Asisten bisa membaca task yang sedang tampil, termasuk perubahan yang
+belum disimpan, lalu menyusun usulan perubahan. ZenoWork tetap menjaga kontrol
+di tangan pengguna: AI tidak menulis langsung ke SQLite.
+
+Mode yang tersedia:
+
+- API key Anthropic,
+- Claude CLI,
+- Codex CLI.
+
+Kunci API disimpan lokal di database aplikasi dan tidak pernah dikirim balik ke
+renderer setelah tersimpan.
+
+### Repository Git
+
+Setiap task bisa dihubungkan ke folder repository Git lokal. Saat diminta, AI
+dapat membaca status branch, HEAD, daftar file berubah, dan potongan diff yang
+dibatasi. ZenoWork tidak melakukan `git add`, `commit`, `push`, atau operasi
+tulis lain.
+
+## Backup dan Pindah Perangkat
+
+Gunakan menu export/import di aplikasi:
+
+- **Export JSON** untuk backup penuh task dan hierarki.
+- **Import JSON** untuk memulihkan data di instalasi lain.
+- **Export CSV/Markdown/XLSX** untuk laporan atau dokumentasi.
+
+Import JSON meminta konfirmasi karena dapat mengganti daftar task yang sedang
+ada. Setelan AI dan kunci API tidak ikut diekspor, jadi perlu diatur ulang di
+perangkat baru.
+
+Data aplikasi disimpan di folder data sistem:
+
+- macOS: `~/Library/Application Support/ZenoWork/data`
+- Windows: `%APPDATA%\ZenoWork\data`
+
+## Pintasan Keyboard
+
+| Tombol | Aksi |
+| --- | --- |
+| `N` / `Shift+N` | Task baru sebagai saudara / anak |
+| `Tab` / `Shift+Tab` | Indent / outdent baris terpilih |
+| `Cmd+]` / `Cmd+[` | Indent / outdent |
+| `Cmd+Up` / `Cmd+Down` | Pindahkan baris beserta sub-task |
+| `Left` / `Right` | Tutup / buka sub-task |
+| `Shift+Cmd+[` / `Shift+Cmd+]` | Tutup semua / buka semua |
+| `Option+Left` / `Option+Right` | Geser jadwal 1 hari |
+| `Option+Shift+Left` / `Option+Shift+Right` | Ubah tanggal selesai |
+| `Option+Cmd+Left` / `Option+Cmd+Right` | Ubah tanggal mulai |
+| tahan `Ctrl` | Loncat 1 minggu saat menggeser jadwal |
+| `Cmd+S` | Simpan perubahan |
+| `Cmd+Z` / `Shift+Cmd+Z` | Undo / redo |
+| `Cmd+F` | Fokus pencarian |
+| `T` | Lompat ke hari ini |
+| `Delete` | Hapus baris terpilih |
+
+Di Windows/Linux, gunakan `Ctrl` untuk pintasan yang memakai `Cmd`.
+
+## Development
+
+ZenoWork dibangun dengan Next.js static export, React, Electron, SQLite bawaan
+Node, dan Animate UI.
+
+Prasyarat:
+
+- Node.js `>=22.13.0`
+- npm
+
+Jalankan mode development:
 
 ```bash
 npm install
-npm run desktop:dev     # jendela ZenoWork + hot reload
+npm run desktop:dev
 ```
 
-Memerlukan Node.js 22.13 atau lebih baru.
-
-ZenoWork tidak bisa dibuka lewat browser. Semua datanya lewat jembatan IPC yang
-hanya ada di dalam jendela Electron; membuka halamannya di Chrome cuma
-memunculkan pesan bahwa jembatannya tidak ada.
-
-Database SQLite dibuat otomatis saat pertama dijalankan dan diisi contoh susunan
-kerja supaya layar pertama tidak kosong. Database dan backup disimpan permanen
-di folder data aplikasi sistem (`~/Library/Application Support/ZenoWork/data` di
-macOS atau `%APPDATA%\\ZenoWork\\data` di Windows), sehingga upgrade aplikasi
-tidak menimpa data pekerjaan.
+Perintah yang sering dipakai:
 
 ```bash
-npm test             # logika pohon, roll-up, filter
-npm run test:desktop # uji asap Renderer → IPC → Main pada aplikasi sungguhan
-npm run typecheck    # halaman dan proses utama, dua-duanya
+npm run typecheck
+npm test
+npm run test:desktop
 ```
 
-## Arsitektur
-
-Satu arah, tanpa jaringan lokal:
-
-```
-Renderer  halaman statis hasil `next build`, disajikan lewat skema app://
-   │      window.zeno.tasks.sync(diff)
-   ▼
-preload   contextBridge dalam sandbox — satu-satunya pintu
-   │      ipcRenderer.invoke("tasks:sync", diff)
-   ▼
-Main      lib/sync.ts → lib/db.ts (node:sqlite), lib/chat.ts, lib/xlsx.ts
-```
-
-Halaman tidak punya akses ke berkas, database, kunci API, maupun jaringan
-keluar. Daftar salurannya ada di [electron/api.ts](electron/api.ts) dan berupa
-union literal, jadi salah ketik nama saluran gagal saat kompilasi — bukan saat
-dipakai.
-
-| Saluran | Isi |
-|---------|-----|
-| `tasks:load` / `tasks:sync` | Baca seluruh tabel / kirim selisih (creates → patches → deletes) |
-| `settings:get` / `settings:set` | Setelan AI. Kunci API tidak pernah dikirim balik ke halaman |
-| `backup:save` / `backup:restore` | Export & import JSON lewat dialog sistem |
-| `export:xlsx` / `export:text` | Lembar Gantt DTDI, CSV, Markdown |
-| `chat:send` | Asisten AI — kunci API dan CLI hanya tersentuh di proses utama |
-| `repository:choose` | Pilih folder Git lokal untuk konteks AI read-only |
-
-Chat mengirim snapshot task yang sedang tampil di editor, termasuk perubahan
-yang belum disimpan. AI memakai snapshot itu untuk membaca, mencari, dan
-menyusun usulan; database tetap hanya berubah lewat `tasks:sync` saat pengguna
-menekan **Simpan**.
-Mode API hanya diberi peta awal tingkat 1 lalu menelusuri detail dengan
-`tree_search`, `find_tasks`, dan `get_subtree`; mode CLI tetap menerima outline
-lengkap karena belum punya tool-call interaktif.
-
-### Repository sebagai sumber task AI
-
-Pada setiap baris task, klik ikon Git untuk memilih repository. Ikon yang aktif
-membuka ringkasan branch, HEAD, jumlah perubahan, waktu pemeriksaan AI terakhir,
-serta tombol **Ganti**, **Cek sekarang**, dan **Lepas**. Pengaitan ini menjadi
-bagian dari data task dan baru permanen setelah tombol **Simpan** ditekan.
-Sub-task yang tidak punya repo sendiri otomatis memakai repo milik induknya.
-
-Ketika pengguna berkata “cek Git di 5.7”, ZenoWork mencari repo pada WBS `5.7`,
-lalu naik ke induknya bila belum ada. Aplikasi mengambil branch/status, commit
-baru sejak pemeriksaan sebelumnya, nama berkas berubah, serta potongan diff
-staged/unstaged yang dibatasi. `.env`, credential/key, lockfile, binary, file
-besar, dan isi file untracked tidak dibaca; pola secret umum juga disamarkan.
-ZenoWork tidak dapat menulis, stage, ataupun commit ke repository. AI memakai
-bukti ini untuk membuat usulan task WBS yang tetap harus disimpan pengguna.
-
-## Membangun
+## Build Desktop
 
 ```bash
 npm run desktop:pack          # ZenoWork.app tanpa installer
@@ -90,100 +177,63 @@ npm run desktop:dist:mac      # DMG + ZIP macOS di release/
 npm run desktop:dist:win      # installer + portable EXE Windows
 ```
 
-Setelah dipaket, isinya bisa diuji apa adanya:
+Untuk build lokal tanpa signing macOS:
+
+```bash
+CSC_IDENTITY_AUTO_DISCOVERY=false npm run desktop:dist:mac
+```
+
+Setelah dipaket, aplikasi bisa diuji dengan:
 
 ```bash
 npx tsx scripts/smoke-desktop.ts --packaged
 ```
 
-### Release ke GitHub
+## Release
 
-Windows app tidak bisa dibangun dari macOS tanpa Wine, jadi rilis dikerjakan
-GitHub Actions: tiap sistem dibangun di runner-nya sendiri lalu dilampirkan ke
-satu Release yang sama.
+Release otomatis berjalan dari GitHub Actions ketika tag `v*` dipush.
 
 ```bash
-npm version minor                      # naikkan versi + bikin tag v0.x.0
-git push origin main --follow-tags     # tag inilah yang memicu build
+npm version minor
+git push origin main --follow-tags
 ```
 
-Tag `v*` menjalankan [.github/workflows/release.yml](.github/workflows/release.yml)
-— macOS (DMG + ZIP, arm64 dan x64) serta Windows (installer NSIS + portable
-EXE). Versi di tag harus sama dengan `version` di `package.json`; `npm version`
-sudah menjaganya sejalan.
+Workflow [.github/workflows/release.yml](.github/workflows/release.yml)
+membangun macOS dan Windows di runner masing-masing, lalu mengunggah semua aset
+ke satu GitHub Release.
 
-Aplikasi macOS-nya **tidak ditandatangani** — runner GitHub tidak punya
-sertifikat Apple. Saat pertama dibuka macOS akan menolaknya. Lepaskan
-karantinanya sekali:
+## Arsitektur Singkat
 
-```bash
-xattr -dr com.apple.quarantine /Applications/ZenoWork.app
+```text
+Renderer  Next.js static export, disajikan lewat skema app://
+   |
+   | window.zeno.tasks.sync(diff)
+   v
+Preload   contextBridge dalam sandbox
+   |
+   | ipcRenderer.invoke("tasks:sync", diff)
+   v
+Main      lib/sync.ts -> lib/db.ts, lib/chat.ts, lib/xlsx.ts
 ```
 
-Jalankan perintah distribusi pada sistem targetnya agar runtime native yang
-terpaket sesuai: macOS untuk DMG/ZIP, Windows x64 untuk installer/portable EXE.
+Halaman tidak punya akses langsung ke berkas, database, kunci API, atau jaringan
+keluar. Semua akses desktop melewati kontrak IPC di
+[electron/api.ts](electron/api.ts).
 
-Untuk pindah instalasi atau sistem operasi, pilih **Export JSON (backup data)**
-di aplikasi lama, lalu **Import JSON (pulihkan data)** di aplikasi baru. Import
-meminta konfirmasi sebelum mengganti seluruh task. Setelan AI dan kunci API
-tidak ikut diekspor, sehingga harus diatur kembali di perangkat baru.
+Struktur kode utama:
 
-## Yang sudah jalan
-
-- Tabel WBS bernomor otomatis (`1`, `1.1`, `1.1.1`, `2`), dihitung ulang setiap
-  baris dipindah, disisipkan, atau dihapus.
-- Edit inline ala spreadsheet: Enter simpan, Esc batal, Tab pindah sel.
-- Indent/outdent, drag baris dengan indikator tingkat, expand/collapse.
-- Roll-up otomatis: progres induk berbobot durasi, rentang tanggal gabungan
-  anak, status diturunkan. Sel induk read-only.
-- Timeline: bar per task, bar ringkasan untuk induk, garis hari ini, weekend
-  diarsir, zoom Hari/Minggu/Bulan.
-- View kalender bulanan: task tampil di setiap tanggal dalam rentangnya,
-  navigasi bulan, sinkron dengan filter dan selection, serta opsi hanya task daun.
-- **Simpan eksplisit**: perubahan ditahan di memori; tombol **Simpan N**
-  muncul di kanan atas saat ada yang berubah, atau tekan `⌘S`. Menutup jendela
-  dengan perubahan yang belum disimpan akan dikonfirmasi dulu.
-- **Sel tanggal**: klik kolom Start/End membuka kalender; kolom teksnya tetap
-  menerima ketikan (`besok`, `senin`, `+3d`, `10/09`).
-- **Drag jadwal**: badan bar menggeser tanggal (durasi tetap), ujung bar
-  mengubah durasi. Kolom Start/End ikut berubah real-time. `Esc` membatalkan.
-  Menggeser bar induk memindahkan seluruh sub-pohonnya.
-- Urutan baris **hanya manual** — diatur lewat drag, indent/outdent, dan
-  `⌘↑`/`⌘↓`. Tidak ada pengurutan per kolom.
-- Filter dengan leluhur tetap tampil sebagai konteks.
-- Undo/redo (satu drag = satu langkah). Export JSON/CSV/Markdown/XLSX dan
-  import JSON, semuanya lewat dialog simpan bawaan sistem.
-
-## Pintasan
-
-| Tombol | Aksi |
-|--------|------|
-| `N` / `⇧N` | Task baru sebagai saudara / anak |
-| `Tab` / `⇧Tab` | Indent / outdent baris terpilih |
-| `⌘]` / `⌘[` | Indent / outdent |
-| `⌘↑` / `⌘↓` | Pindahkan baris beserta sub-pohonnya |
-| `←` / `→` | Tutup / buka sub-task |
-| `⇧⌘[` / `⇧⌘]` | Tutup semua / buka semua |
-| `⌥←` / `⌥→` | Geser jadwal 1 hari |
-| `⌥⇧←` / `⌥⇧→` | Ubah tanggal selesai saja |
-| `⌥⌘←` / `⌥⌘→` | Ubah tanggal mulai saja |
-| tahan `Ctrl` | Loncat 1 minggu, bukan 1 hari |
-| `⌘S` | Simpan perubahan |
-| `⌘Z` / `⇧⌘Z` | Undo / redo |
-| `⌘F` | Fokus pencarian |
-| `T` | Lompat ke hari ini |
-| `Del` | Hapus baris terpilih |
-
-## Struktur
-
+```text
+components/       UI aplikasi: tabel, timeline, kalender, toolbar, chat
+components/animate-ui/
+                  komponen Animate UI yang dipakai aplikasi
+electron/         main process, preload, dan handler IPC
+lib/tree.ts       operasi pohon WBS
+lib/rollup.ts     nomor WBS, status, tanggal, dan progress roll-up
+lib/rows.ts       hasil baris setelah collapse/filter
+lib/schedule.ts   geometri timeline
+lib/store.ts      state renderer, undo/redo, pending changes
+lib/db.ts         SQLite lokal
+lib/sync.ts       penerapan diff ke database
 ```
-lib/tree.ts      operasi pohon murni (pindah, indent, outdent, hapus)
-lib/rollup.ts    rangkai pohon, hitung nomor WBS dan nilai roll-up
-lib/rows.ts      baris yang digambar: hierarki → collapse → filter
-lib/schedule.ts  geometri timeline (tanggal ↔ px, snapping)
-lib/store.ts     state klien, undo/redo, sinkronisasi selisih lewat IPC
-lib/bridge.ts    akses halaman ke window.zeno
-lib/sync.ts      penerapan selisih di sisi main; urutannya mengikat
-lib/db.ts        SQLite bawaan Node, semua tulisan dalam transaksi
-electron/        kontrak IPC, preload, handler, proses utama
-```
+
+Spesifikasi produk lebih lengkap ada di [docs/PRD.md](docs/PRD.md).
