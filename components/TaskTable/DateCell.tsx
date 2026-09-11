@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { addDays, addMonths, addYears } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/animate-ui/components/buttons/button";
 import {
   Popover,
   PopoverAnchor,
   PopoverContent,
 } from "@/components/animate-ui/components/radix/popover";
-import { formatLong, fromISO, parseDateInput, toISO } from "@/lib/dates";
+import { formatLong, fromISO, parseDateInput, todayISO, toISO } from "@/lib/dates";
 
 type Seg = "y" | "m" | "d";
 const SEGS: Seg[] = ["y", "m", "d"];
@@ -256,9 +257,20 @@ export default function DateCell({
             onEnd();
           }}
         />
-        <div className="border-t border-[var(--color-line)] p-1.5">
+        <div className="flex gap-1.5 border-t border-[var(--color-line)] p-1.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 shrink-0 px-2 text-[11px]"
+            onClick={() => {
+              onChange(todayISO());
+              onEnd();
+            }}
+          >
+            Hari ini
+          </Button>
           <input
-            className="h-6 w-full rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-1.5 text-[11px] outline-none focus:border-[var(--color-mark)]"
+            className="h-6 min-w-0 flex-1 rounded border border-[var(--color-line)] bg-[var(--color-surface)] px-1.5 text-[11px] outline-none focus:border-[var(--color-mark)]"
             placeholder="atau ketik: besok, senin, +3d, 10/09"
             onKeyDown={(e) => {
               if (e.key !== "Enter") return;
